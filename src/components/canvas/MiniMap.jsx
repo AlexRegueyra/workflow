@@ -14,31 +14,42 @@ const MiniMap = ({
 
     useEffect(() => {
         const canvas = canvasRef.current;
+        if (!canvas) return;
+        
         const ctx = canvas.getContext('2d');
         
         // Limpiar canvas
         ctx.clearRect(0, 0, containerWidth, containerHeight);
         
+        // Si no hay nodos, dibuja solo el fondo
+        if (!nodes.length) {
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, containerWidth, containerHeight);
+            return;
+        }
+        
         // Calcular límites del workflow
         const nodePositions = nodes.map(node => ({ x: node.x, y: node.y }));
-        const minX = Math.min(...nodePositions.map(pos => pos.x));
-        const maxX = Math.max(...nodePositions.map(pos => pos.x));
-        const minY = Math.min(...nodePositions.map(pos => pos.y));
-        const maxY = Math.max(...nodePositions.map(pos => pos.y));
+        const minX = Math.min(...nodePositions.map(pos => pos.x)) - 50;
+        const maxX = Math.max(...nodePositions.map(pos => pos.x)) + 300; // Ancho del nodo + margen
+        const minY = Math.min(...nodePositions.map(pos => pos.y)) - 50;
+        const maxY = Math.max(...nodePositions.map(pos => pos.y)) + 100; // Alto del nodo + margen
         
-        const padding = 20;
-        const workflowWidth = maxX - minX + padding * 2;
-        const workflowHeight = maxY - minY + padding * 2;
+        const workflowWidth = Math.max(maxX - minX, 500);
+        const workflowHeight = Math.max(maxY - minY, 300);
         
         const scaleX = containerWidth / workflowWidth;
         const scaleY = containerHeight / workflowHeight;
         const minimapScale = Math.min(scaleX, scaleY);
         
-        // Dibujar fondo con cuadrícula
+        // Dibujar fondo
         ctx.fillStyle = '#f8f9fa';
         ctx.fillRect(0, 0, containerWidth, containerHeight);
+        
+        // Dibujar cuadrícula simple
         ctx.strokeStyle = '#e9ecef';
-        const gridSize = 10;
+        ctx.lineWidth = 0.5;
+        const gridSize = 20;
         for (let x = 0; x < containerWidth; x += gridSize) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
@@ -52,19 +63,23 @@ const MiniMap = ({
             ctx.stroke();
         }
 
+        // Calcular escalas y offset para centrar el contenido
+        const offsetX = (containerWidth - workflowWidth * minimapScale) / 2;
+        const offsetY = (containerHeight - workflowHeight * minimapScale) / 2;
+
         // Dibujar conexiones
         ctx.beginPath();
         ctx.strokeStyle = '#94a3b8';
         ctx.lineWidth = 1;
         connections.forEach(connection => {
-            const sourceNode = nodes.find(n => n.id === connection.startNode.id);
-            const targetNode = nodes.find(n => n.id === connection.endNode.id);
+            const sourceNode = connection.startNode;
+            const targetNode = connection.endNode;
             
             if (sourceNode && targetNode) {
-                const startX = (sourceNode.x - minX + padding) * minimapScale;
-                const startY = (sourceNode.y - minY + padding) * minimapScale;
-                const endX = (targetNode.x - minX + padding) * minimapScale;
-                const endY = (targetNode.y - minY + padding) * minimapScale;
+                const startX = (sourceNode.x - minX) * minimapScale + offsetX;
+                const startY = (sourceNode.y - minY) * minimapScale + offsetY;
+                const endX = (targetNode.x - minX) * minimapScale + offsetX;
+                const endY = (targetNode.y - minY) * minimapScale + offsetY;
                 
                 ctx.moveTo(startX, startY);
                 ctx.lineTo(endX, endY);
@@ -74,8 +89,10 @@ const MiniMap = ({
         
         // Dibujar nodos
         nodes.forEach(node => {
-            const x = (node.x - minX + padding) * minimapScale;
-            const y = (node.y - minY + padding) * minimapScale;
+            const x = (node.x - minX) * minimapScale + offsetX;
+            const y = (node.y - minY) * minimapScale + offsetY;
+            const width = 256 * minimapScale;  // Ancho estimado del nodo
+            const height = 64 * minimapScale;  // Alto estimado del nodo
             
             // Sombra del nodo
             ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
@@ -85,7 +102,7 @@ const MiniMap = ({
             
             // Fondo del nodo
             ctx.fillStyle = '#3b82f6';
-            ctx.fillRect(x - 4, y - 4, 8, 8);
+            ctx.fillRect(x, y, width, height);
             
             // Resetear sombra
             ctx.shadowColor = 'transparent';
@@ -94,18 +111,37 @@ const MiniMap = ({
             ctx.shadowOffsetY = 0;
         });
 
-        // Dibujar viewport si está disponible
-        if (viewportRect) {
+        // Calcular y dibujar el viewport visible
+        if (scale) {
+            const containerRect = canvas.parentElement.parentElement.getBoundingClientRect();
+            const visibleWidth = containerRect.width / scale;
+            const visibleHeight = containerRect.height / scale;
+            
+            // Ajustar por posición actual del viewport
+            const viewX = ((-position.x || 0) + minX) * minimapScale + offsetX;
+            const viewY = ((-position.y || 0) + minY) * minimapScale + offsetY;
+            const viewW = visibleWidth * minimapScale;
+            const viewH = visibleHeight * minimapScale;
+            
+            // Guardar para uso en interacciones
+            setViewportRect({
+                x: viewX,
+                y: viewY,
+                width: viewW,
+                height: viewH,
+                offsetX,
+                offsetY,
+                minimapScale,
+                minX,
+                minY
+            });
+            
+            // Dibujar recuadro del viewport
             ctx.strokeStyle = '#3b82f6';
             ctx.lineWidth = 2;
-            ctx.strokeRect(
-                viewportRect.x * minimapScale,
-                viewportRect.y * minimapScale,
-                viewportRect.width * minimapScale,
-                viewportRect.height * minimapScale
-            );
+            ctx.strokeRect(viewX, viewY, viewW, viewH);
         }
-    }, [nodes, connections, containerWidth, containerHeight, viewportRect]);
+    }, [nodes, connections, containerWidth, containerHeight, scale]);
 
     const handleMouseDown = (e) => {
         setIsDragging(true);
@@ -123,15 +159,28 @@ const MiniMap = ({
     };
 
     const updateViewport = (e) => {
+        if (!viewportRect || !onViewportChange) return;
+        
         const rect = canvasRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        onViewportChange?.({ x, y });
+        
+        // Convertir coordenadas del minimapa a coordenadas del workflow
+        const workflowX = (x - viewportRect.offsetX) / viewportRect.minimapScale + viewportRect.minX;
+        const workflowY = (y - viewportRect.offsetY) / viewportRect.minimapScale + viewportRect.minY;
+        
+        onViewportChange({ x: workflowX, y: workflowY });
     };
 
+    // Recuperar 'position' del contexto o props
+    const position = { x: 0, y: 0 }; // Cámbialo para obtenerlo de props si es necesario
+
     return (
-        <div className="fixed bottom-4 right-4 bg-white border rounded-lg shadow-lg p-2">
-            <div className="text-xs text-gray-500 mb-1 px-1">Vista General</div>
+        <div className="fixed bottom-4 right-4 bg-white border rounded-lg shadow-lg p-2 z-20">
+            <div className="text-xs text-gray-500 mb-1 px-1 flex justify-between">
+                <span>Vista General</span>
+                <span>{Math.round(scale * 100)}%</span>
+            </div>
             <canvas
                 ref={canvasRef}
                 width={containerWidth}
@@ -144,7 +193,7 @@ const MiniMap = ({
             />
             <div className="flex justify-between mt-1 px-1 text-xs text-gray-400">
                 <span>{nodes.length} nodos</span>
-                <span>{Math.round(scale * 100)}%</span>
+                <span>{connections.length} conexiones</span>
             </div>
         </div>
     );

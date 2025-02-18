@@ -9,7 +9,8 @@ const Toolbar = ({
     onSave, 
     onSettingsClick,
     onHistoryClick,
-    lastSaved
+    lastSaved,
+    notificationBell // Prop para la campanita (opcional)
 }) => {
     return (
         <div className="bg-white border-b px-4 py-2 flex items-center justify-between">
@@ -55,29 +56,41 @@ const Toolbar = ({
                 )}
                 
                 <div className="flex items-center gap-2">
-                <button 
-                    onClick={onSave}
-                    className="p-2 hover:bg-gray-100 rounded-full"
-                    title="Guardar workflow"
-                    disabled={status === 'running'}
-                >
-                    <Save className="w-5 h-5 text-gray-600" />
-                </button>
-                <button 
-                    onClick={onHistoryClick}  // Nuevo botón
-                    className="p-2 hover:bg-gray-100 rounded-full"
-                    title="Historial de ejecuciones"
-                >
-                    <Clock className="w-5 h-5 text-gray-600" />
-                </button>
-                <button 
-                    onClick={onSettingsClick}
-                    className="p-2 hover:bg-gray-100 rounded-full"
-                    title="Configuración"
-                >
-                    <Settings className="w-5 h-5 text-gray-600" />
-                </button>
-            </div>
+                    {/* Campanita de notificaciones (opcional) */}
+                    {notificationBell && (
+                        <div className="mr-2">
+                            {notificationBell}
+                        </div>
+                    )}
+                    
+                    <button 
+                        onClick={onSave}
+                        className="p-2 hover:bg-gray-100 rounded-full"
+                        title="Guardar workflow"
+                        disabled={status === 'running'}
+                        type="button"
+                    >
+                        <Save className="w-5 h-5 text-gray-600" />
+                    </button>
+                    
+                    <button 
+                        onClick={onHistoryClick}
+                        className="p-2 hover:bg-gray-100 rounded-full"
+                        title="Historial de ejecuciones"
+                        type="button"
+                    >
+                        <Clock className="w-5 h-5 text-gray-600" />
+                    </button>
+                    
+                    <button 
+                        onClick={onSettingsClick}
+                        className="p-2 hover:bg-gray-100 rounded-full"
+                        title="Configuración"
+                        type="button"
+                    >
+                        <Settings className="w-5 h-5 text-gray-600" />
+                    </button>
+                </div>
             </div>
         </div>
     );

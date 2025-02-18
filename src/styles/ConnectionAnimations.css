@@ -1,0 +1,179 @@
+@keyframes flowDash {
+    to {
+        stroke-dashoffset: -40;
+    }
+}
+
+.flow-animation {
+    stroke-dasharray: 5 8;
+    stroke-dashoffset: 0;
+    animation: flowDash 5s linear infinite;
+}
+
+/* Estilos específicos para tipos de conexiones */
+.connection-straight .flow-animation {
+    stroke-dasharray: 4 6;
+    animation-duration: 4s;
+}
+
+.connection-curved .flow-animation {
+    stroke-dasharray: 5 8;
+    animation-duration: 5s;
+}
+
+.connection-angular .flow-animation {
+    stroke-dasharray: 3 5;
+    animation-duration: 4.5s;
+}
+
+/* Animación de Pulso para nuevas conexiones */
+@keyframes pulseGlow {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.3));
+    }
+
+    50% {
+        filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
+    }
+}
+
+.connection-new {
+    animation: pulseGlow 2s ease-in-out 2;
+}
+
+/* Animación para drag */
+@keyframes dragPulse {
+
+    0%,
+    100% {
+        stroke-opacity: 0.7;
+    }
+
+    50% {
+        stroke-opacity: 1;
+    }
+}
+
+.connection-dragging {
+    animation: dragPulse 1s ease-in-out infinite;
+}
+
+/* Animación de advertencia */
+@keyframes warningPulse {
+
+    0%,
+    100% {
+        stroke: #ef4444;
+    }
+
+    50% {
+        stroke: #f87171;
+    }
+}
+
+.connection-warning {
+    animation: warningPulse 1s ease-in-out infinite;
+    stroke-width: 2.5px;
+}
+
+/* Estilos para etiquetas */
+.connection-label {
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+    pointer-events: all;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0.9;
+}
+
+.connection-label:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    opacity: 1;
+}
+
+.connection-label-selected {
+    border-color: #8b5cf6;
+    background-color: #f5f3ff;
+}
+
+/* Personalización del selector de conexiones */
+.connection-selector {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.connection-selector:hover {
+    transform: scale(1.02);
+}
+
+/* Animaciones de notificación */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.notification-enter {
+    animation: slideIn 0.3s forwards;
+}
+
+.notification-exit {
+    animation: slideOut 0.3s forwards;
+}
+
+/* Animaciones estilo Instagram */
+.progress-bar {
+    height: 2px;
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.2) 0%, rgba(59, 130, 246, 0.7) 100%);
+    transition: width linear;
+}
+
+.notification-item {
+    backdrop-filter: blur(8px);
+    border-left: 3px solid;
+}
+
+.success-notification {
+    border-left-color: #10b981;
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.error-notification {
+    border-left-color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.info-notification {
+    border-left-color: #3b82f6;
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+.warning-notification {
+    border-left-color: #f59e0b;
+    background-color: rgba(245, 158, 11, 0.1);
+}

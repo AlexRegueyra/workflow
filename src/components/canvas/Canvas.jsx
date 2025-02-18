@@ -1,26 +1,38 @@
+// Modificaciones en Canvas.jsx
 import { useState, useRef, useEffect } from 'react';
-import { Globe, Database, Mail, Undo, Redo, Trash2, ZoomIn, ZoomOut, Download, Upload, Share2 } from 'lucide-react';
+import { Globe, Database, Mail, Undo, Redo, ZoomIn, ZoomOut, Download, Upload, Share2 } from 'lucide-react';
 import ConfigPanel from '../sidebar/ConfigPanel';
-import Connection from './Connection';
 import EnhancedConnection from './EnhancedConnection';
 import Node from './Node';
 import MiniMap from './MiniMap';
 import DataPreview from '../preview/DataPreview';
 import ContextMenu from './ContextMenu';
 import GridBackground, { snapToGrid } from './GridBackground';
+import ConnectionSettingsButton from './ConnectionSettingsButton';
 import { validateConnection } from '../../config/services';
 import { useHistory } from '../../hooks/useHistory';
 import { validateWorkflow } from '../../utils/workflowValidator';
+
 import {
     exportAsImage,
     exportAsJson,
-    importFromJson,
     generateShareableUrl,
-    alignNodes,
-    distributeNodes
+    alignNodes
 } from '../../utils/workflowUtils';
 
+// Importar estilos para animaciones
+import '../../styles/ConnectionAnimations.css';
+import { NotificationBellComponent, useNotifications } from '../../contexts/NotificationContext';
+
 const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
+    // Sistema de notificaciones
+    const { 
+        success, 
+        error, 
+        info, 
+        warning
+    } = useNotifications();
+
     // Sistema de historial
     const {
         state: historyState,
@@ -51,7 +63,9 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
     const [showGrid, setShowGrid] = useState(true);
     const [snapToGridEnabled, setSnapToGridEnabled] = useState(true);
     const [copiedNode, setCopiedNode] = useState(null);
-    const [connectionType, setConnectionType] = useState(EnhancedConnection.Types.CURVED);
+
+    // Estados para conexiones - siempre mostraremos el botón ahora
+    const [connectionType, setConnectionType] = useState('curved');
     const [showFlowAnimation, setShowFlowAnimation] = useState(false);
 
     // Sincronización del estado con el historial
@@ -76,13 +90,41 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
         const validation = validateWorkflow(newNodes || nodes, newConnections || connections);
         if (!validation.isValid) {
             validation.errors.forEach(error => {
-                const notification = document.createElement('div');
-                notification.className = 'fixed bottom-4 right-4 bg-yellow-500 text-white px-4 py-2 rounded-md shadow-lg';
-                notification.textContent = error.message;
-                document.body.appendChild(notification);
-                setTimeout(() => notification.remove(), 3000);
+                warning(error.message);
             });
         }
+    };
+
+    // Función auxiliar para actualizar las referencias de las conexiones
+    const updateConnectionReferences = (newNodes, existingConnections) => {
+        // Crear un mapa de nodos por ID para búsqueda rápida
+        const nodeMap = newNodes.reduce((map, node) => {
+            map[node.id] = node;
+            return map;
+        }, {});
+
+        // Actualizar las referencias en las conexiones
+        return existingConnections.map(conn => {
+            // Saltarse conexiones inválidas
+            if (!conn.startNode || !conn.endNode) {
+                return conn;
+            }
+
+            const startNodeId = conn.startNode.id;
+            const endNodeId = conn.endNode.id;
+
+            // Verificar que ambos nodos existan todavía
+            if (nodeMap[startNodeId] && nodeMap[endNodeId]) {
+                return {
+                    ...conn,
+                    startNode: nodeMap[startNodeId],
+                    endNode: nodeMap[endNodeId]
+                };
+            }
+
+            // Si alguno de los nodos ya no existe, mantener la conexión sin cambios
+            return conn;
+        });
     };
 
     // Manejadores de eventos
@@ -121,8 +163,10 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
 
             const newNodes = [...nodes, newNode];
             updateWorkflowState(newNodes, connections);
+            success(`Nodo "${newNode.name}" creado`);
         } catch (error) {
             console.error('Error al soltar el elemento:', error);
+            error('Error al crear el nodo');
         }
     };
 
@@ -150,29 +194,32 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                     : node
             );
 
-            const newConnections = connections.map(conn => {
-                if (conn.startNode.id === draggingNode.id) {
-                    return {
-                        ...conn,
-                        startNode: { ...conn.startNode, x: newX, y: newY }
-                    };
-                }
-                if (conn.endNode.id === draggingNode.id) {
-                    return {
-                        ...conn,
-                        endNode: { ...conn.endNode, x: newX, y: newY }
-                    };
-                }
-                return conn;
-            });
+            // Actualizar conexiones sin acumular en el historial
+            const newConnections = updateConnectionReferences(newNodes, connections);
 
-            updateWorkflowState(newNodes, newConnections);
+            // Actualizar estado local sin guardar en historial durante el arrastre
+            setNodes(newNodes);
+            setConnections(newConnections);
         }
     };
 
     const handleMouseUp = (e) => {
+        // Finalizar arrastre de nodos y guardar en historial
+        if (draggingNode) {
+            updateWorkflowState(nodes, connections);
+            setDraggingNode(null);
+            return;
+        }
+
+        // Manejar creación de conexiones
         if (draggingConnection && draggingConnection.startNode) {
             const targetNode = nodes.find(node => {
+                // Evitar conectar al mismo nodo
+                if (node.id === draggingConnection.startNode.id) {
+                    return false;
+                }
+
+                // Verificar si el mouse está sobre el nodo
                 const nodeRect = {
                     left: node.x,
                     right: node.x + 256,
@@ -185,30 +232,41 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                     mousePosition.y <= nodeRect.bottom;
             });
 
-            if (targetNode && draggingConnection.startNode.id !== targetNode.id) {
-                const validation = validateConnection(draggingConnection.startNode, targetNode);
+            if (targetNode) {
+                try {
+                    // Crear una copia para evitar referencias circulares
+                    const sourceNode = JSON.parse(JSON.stringify(
+                        nodes.find(n => n.id === draggingConnection.startNode.id)
+                    ));
+                    const targetNodeCopy = JSON.parse(JSON.stringify(targetNode));
 
-                if (validation.valid) {
-                    const newConnection = {
-                        id: Date.now(),
-                        startNode: draggingConnection.startNode,
-                        endNode: targetNode,
-                        label: '',
-                        type: connectionType
-                    };
-                    const newConnections = [...connections, newConnection];
-                    updateWorkflowState(nodes, newConnections);
-                } else {
-                    const notification = document.createElement('div');
-                    notification.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-lg';
-                    notification.textContent = validation.message;
-                    document.body.appendChild(notification);
-                    setTimeout(() => notification.remove(), 3000);
+                    // Validar la conexión
+                    const validation = validateConnection(sourceNode, targetNodeCopy);
+
+                    if (validation.valid) {
+                        // Crear la conexión
+                        const newConnection = {
+                            id: Date.now(),
+                            startNode: sourceNode,
+                            endNode: targetNodeCopy,
+                            label: '',
+                            type: connectionType
+                        };
+
+                        const newConnections = [...connections, newConnection];
+                        updateWorkflowState(nodes, newConnections);
+                        success('Conexión creada');
+                    } else {
+                        error(validation.message || 'Conexión no válida');
+                    }
+                } catch (err) {
+                    console.error('Error al crear la conexión:', err);
+                    error('Error al establecer la conexión');
                 }
             }
         }
+
         setDraggingConnection(null);
-        setDraggingNode(null);
     };
 
     const handleNodeClick = (e, node) => {
@@ -240,28 +298,49 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
     };
 
     const handleNodeUpdate = (updatedNode) => {
-        const newNodes = nodes.map(n =>
-            n.id === updatedNode.id ? updatedNode : n
-        );
-        updateWorkflowState(newNodes, connections);
-        setSelectedNode(updatedNode);
+        // Verificar si es una conexión
+        if (connections.some(conn => conn.id === updatedNode.id)) {
+            // Actualizar conexión
+            const newConnections = connections.map(conn =>
+                conn.id === updatedNode.id ? updatedNode : conn
+            );
+            updateWorkflowState(nodes, newConnections);
+            setSelectedNode(updatedNode);
+            success('Conexión actualizada');
+        } else {
+            // Actualizar nodo
+            const newNodes = nodes.map(n =>
+                n.id === updatedNode.id ? updatedNode : n
+            );
+
+            // Actualizar conexiones relacionadas
+            const newConnections = updateConnectionReferences(newNodes, connections);
+
+            updateWorkflowState(newNodes, newConnections);
+            setSelectedNode(updatedNode);
+            success('Nodo actualizado');
+        }
     };
 
     // Acciones para nodos
     const handleNodeDelete = (nodeToDelete) => {
-        const newConnections = connections.filter(
-            conn => conn.startNode.id !== nodeToDelete.id && conn.endNode.id !== nodeToDelete.id
-        );
-        const newNodes = nodes.filter(node => node.id !== nodeToDelete.id);
+        // Verificar si es una conexión
+        if (connections.some(conn => conn.id === nodeToDelete.id)) {
+            const newConnections = connections.filter(conn => conn.id !== nodeToDelete.id);
+            updateWorkflowState(nodes, newConnections);
+            setSelectedNode(null);
+            success('Conexión eliminada');
+        } else {
+            // Es un nodo, eliminar el nodo y sus conexiones
+            const newConnections = connections.filter(
+                conn => conn.startNode.id !== nodeToDelete.id && conn.endNode.id !== nodeToDelete.id
+            );
+            const newNodes = nodes.filter(node => node.id !== nodeToDelete.id);
 
-        updateWorkflowState(newNodes, newConnections);
-        setSelectedNode(null);
-
-        const notification = document.createElement('div');
-        notification.className = 'fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-md shadow-lg';
-        notification.textContent = `Nodo "${nodeToDelete.name}" eliminado`;
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 2000);
+            updateWorkflowState(newNodes, newConnections);
+            setSelectedNode(null);
+            success(`Nodo "${nodeToDelete.name}" eliminado`);
+        }
     };
 
     // Funciones para el menú contextual
@@ -279,6 +358,7 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
 
     const handleCopyNode = (node) => {
         setCopiedNode({ ...node, id: null });
+        info('Nodo copiado al portapapeles');
     };
 
     const handlePasteNode = (nodeToPaste) => {
@@ -303,6 +383,7 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
 
         const newNodes = [...nodes, newNode];
         updateWorkflowState(newNodes, connections);
+        success('Nodo pegado');
     };
 
     const handleDuplicateNode = (node) => {
@@ -316,18 +397,30 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
 
         const newNodes = [...nodes, duplicatedNode];
         updateWorkflowState(newNodes, connections);
+        success(`Nodo "${node.name}" duplicado`);
     };
 
     const handleDeleteNodeConnections = (node) => {
+        const connectionsToDelete = connections.filter(
+            conn => conn.startNode.id === node.id || conn.endNode.id === node.id
+        );
+
+        if (connectionsToDelete.length === 0) {
+            info('No hay conexiones para eliminar');
+            return;
+        }
+
         const newConnections = connections.filter(
             conn => conn.startNode.id !== node.id && conn.endNode.id !== node.id
         );
         updateWorkflowState(nodes, newConnections);
+        info(`${connectionsToDelete.length} conexiones eliminadas`);
     };
 
     const handleAlignNodes = (node, direction) => {
         const newNodes = alignNodes(nodes, node, direction);
         updateWorkflowState(newNodes, connections);
+        success(`Nodos alineados ${direction}`);
     };
 
     // Funciones para el zoom
@@ -340,24 +433,59 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
 
     const handleViewportChange = ({ x, y }) => {
         if (containerRef.current) {
-            // Ajusta estos cálculos según sea necesario
-            const rect = containerRef.current.getBoundingClientRect();
             // Utiliza transformaciones inversas para mover el canvas
+            const rect = containerRef.current.getBoundingClientRect();
             const newX = (rect.width / 2) - (x * scale);
             const newY = (rect.height / 2) - (y * scale);
 
-            console.log('Moviendo viewport a:', newX, newY);
             setPosition({ x: newX, y: newY });
         }
     };
 
+    // Funciones para conexiones
+    const handleChangeConnectionType = (type) => {
+        setConnectionType(type);
+
+        // Si hay una conexión seleccionada, actualizar su tipo
+        if (selectedNode && connections.some(c => c.id === selectedNode.id)) {
+            const newConnections = connections.map(conn =>
+                conn.id === selectedNode.id ? { ...conn, type } : conn
+            );
+            updateWorkflowState(nodes, newConnections);
+            success(`Tipo de conexión cambiado a: ${type}`);
+        } else {
+            // Simplemente actualizar el tipo predeterminado
+            info(`Tipo de conexión predeterminado: ${type}`);
+        }
+    };
+
+    const handleConnectionLabelChange = (connectionId, newLabel) => {
+        const newConnections = connections.map(conn =>
+            conn.id === connectionId ? { ...conn, label: newLabel } : conn
+        );
+        updateWorkflowState(nodes, newConnections);
+        success('Etiqueta de conexión actualizada');
+    };
+
     // Funciones para exportación/importación
     const handleExportImage = () => {
-        exportAsImage(containerRef.current, 'workflow.png');
+        try {
+            exportAsImage(containerRef.current, 'workflow.png');
+            success('Workflow exportado como imagen');
+        } catch (err) {
+            error('Error al exportar como imagen');
+            console.error(err);
+        }
     };
 
     const handleExportJson = () => {
-        exportAsJson({ nodes, connections }, 'workflow.json');
+        try {
+            exportAsJson({ nodes, connections }, 'workflow.json');
+            success('Workflow exportado como JSON');
+        } catch (err) {
+            error('Error al exportar como JSON');
+            console.error(err);
+        }
     };
 
     const handleShareUrl = () => {
@@ -371,82 +499,82 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
             const url = `${baseUrl}?workflow=${encoded}`;
 
             navigator.clipboard.writeText(url);
-            // Mostrar notificación...
+            success('URL copiada al portapapeles');
         } catch (error) {
             console.error('Error al generar URL:', error);
-            // Mostrar error...
-        }
-    };
-
-    const handleConnectionLabelChange = (connectionId, newLabel) => {
-        const newConnections = connections.map(conn =>
-            conn.id === connectionId ? { ...conn, label: newLabel } : conn
-        );
-        updateWorkflowState(nodes, newConnections);
-    };
-
-    const handleChangeConnectionType = (type) => {
-        setConnectionType(type);
-
-        // Actualizar conexiones existentes si se desea
-        if (selectedNode && connections.some(c => c.id === selectedNode.id)) {
-            const newConnections = connections.map(conn =>
-                conn.id === selectedNode.id ? { ...conn, type } : conn
-            );
-            updateWorkflowState(nodes, newConnections);
+            error('Error al generar la URL compartible');
         }
     };
 
     // Atajos de teclado
     useEffect(() => {
         const handleKeyDown = (e) => {
-            console.log('Tecla presionada:', e.key, 'Ctrl:', e.ctrlKey, 'Shift:', e.shiftKey);
-
-            // Asegúrate de que el foco esté en el canvas
+            // Ignorar si el foco está en un input
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
             // Undo/Redo
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
                 if (e.shiftKey) {
                     if (canRedo) {
-                        console.log('Ejecutando REDO');
                         redo();
+                        info('Acción rehecha');
                     }
                 } else {
                     if (canUndo) {
-                        console.log('Ejecutando UNDO');
                         undo();
+                        info('Acción deshecha');
                     }
                 }
                 e.preventDefault();
             }
 
+            // Delete
+            if (e.key === 'Delete' && selectedNode) {
+                handleNodeDelete(selectedNode);
+                e.preventDefault();
+            }
+
             // Copy/Paste
             if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedNode) {
-                console.log('Copiando nodo:', selectedNode.id);
                 handleCopyNode(selectedNode);
                 e.preventDefault();
             }
 
             if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedNode) {
-                console.log('Pegando nodo copiado');
                 handlePasteNode(copiedNode);
                 e.preventDefault();
             }
 
-            // Grid visibility
+            // Toggle Grid
             if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
-                console.log('Alternando visibilidad de cuadrícula');
                 setShowGrid(!showGrid);
+                info(`Cuadrícula ${showGrid ? 'oculta' : 'visible'}`);
+                e.preventDefault();
+            }
+
+            // Toggle Snap to Grid
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'g') {
+                setSnapToGridEnabled(!snapToGridEnabled);
+                info(`Snap to grid ${snapToGridEnabled ? 'desactivado' : 'activado'}`);
                 e.preventDefault();
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [canUndo, canRedo, undo, redo, selectedNode, copiedNode, showGrid, snapToGridEnabled]);
+    }, [
+        canUndo, canRedo, undo, redo, selectedNode,
+        copiedNode, showGrid, snapToGridEnabled,
+        success, error, info, warning
+    ]);
+
     return (
         <div className="flex-1 flex">
+            {/* Campanita de notificaciones */}
+            {/* <div className="absolute top-4 right-16 z-50">
+                <NotificationBellComponent />
+            </div> */}
+
             <div
                 ref={containerRef}
                 className="flex-1 bg-gray-50 relative overflow-hidden"
@@ -459,16 +587,18 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                 onContextMenu={(e) => handleContextMenu(e, null)}
             >
                 {/* Cuadrícula de fondo */}
-                {showGrid && console.log('Mostrando cuadrícula') && (
+                {showGrid && (
                     <GridBackground
                         gridSize={20}
                         showMainLines={true}
                         mainLineEvery={5}
+                        gridColor="rgba(200, 200, 200, 0.2)"
+                        mainLineColor="rgba(180, 180, 180, 0.3)"
                     />
                 )}
 
                 {/* Toolbar principal */}
-                <div className="absolute top-4 left-4 flex gap-2 z-10">
+                <div className="absolute top-4 left-4 flex gap-2 z-30">
                     <button
                         onClick={undo}
                         disabled={!canUndo}
@@ -503,7 +633,7 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                 </div>
 
                 {/* Toolbar secundaria */}
-                <div className="absolute top-4 right-4 flex gap-2 z-10">
+                <div className="absolute top-4 right-4 flex gap-2 z-30">
                     <button
                         onClick={handleExportImage}
                         className="p-2 rounded bg-white hover:bg-gray-100 shadow"
@@ -575,8 +705,8 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                         height: '100%'
                     }}
                 >
-                    {/* Conexiones existentes - Usar EnhancedConnection si está implementado */}
-                    <svg className="absolute inset-0 w-full h-full">
+                    {/* Conexiones existentes - Usar EnhancedConnection */}
+                    <svg className="absolute inset-0 w-full h-full overflow-visible">
                         {connections.map((connection) => (
                             <EnhancedConnection
                                 key={connection.id}
@@ -623,21 +753,37 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                     ))}
                 </div>
 
-                {/* Mini-mapa */}
+                {/* Botón de configuración de conexiones siempre visible */}
+                <ConnectionSettingsButton
+                    currentType={connectionType}
+                    showAnimation={showFlowAnimation}
+                    onTypeChange={handleChangeConnectionType}
+                    onToggleAnimation={() => {
+                        setShowFlowAnimation(!showFlowAnimation);
+                        info(`Animación de flujo ${!showFlowAnimation ? 'activada' : 'desactivada'}`);
+                    }}
+                />
+
+                {/* Mini-mapa - posición mejorada */}
                 <MiniMap
                     nodes={nodes}
                     connections={connections}
                     scale={scale}
+                    position={position}
                     onViewportChange={handleViewportChange}
+                    containerWidth={180}
+                    containerHeight={120}
                 />
 
-                {/* Vista previa de datos */}
-                {showDataPreview && selectedNode && (
-                    <DataPreview
-                        nodeId={selectedNode.id}
-                        data={selectedNode.config}
-                        isLoading={false}
-                    />
+                {/* Vista previa de datos (posicionamiento mejorado) */}
+                {showDataPreview && selectedNode && !connections.some(c => c.id === selectedNode.id) && (
+                    <div className="absolute bottom-40 left-4 z-20 max-w-md">
+                        <DataPreview
+                            nodeId={selectedNode.id}
+                            data={selectedNode.config}
+                            isLoading={false}
+                        />
+                    </div>
                 )}
 
                 {/* Menú contextual */}
@@ -662,14 +808,17 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                 )}
             </div>
 
-            {/* Panel de configuración */}
+            {/* Panel de configuración con posición fija */}
             {selectedNode && (
-                <ConfigPanel
-                    node={selectedNode}
-                    onUpdate={handleNodeUpdate}
-                    onClose={() => setSelectedNode(null)}
-                    onDelete={() => handleNodeDelete(selectedNode)}
-                />
+                <div className="w-80 border-l bg-white overflow-auto z-20">
+                    <ConfigPanel
+                        node={selectedNode}
+                        connections={connections}
+                        onUpdate={handleNodeUpdate}
+                        onClose={() => setSelectedNode(null)}
+                        onDelete={() => handleNodeDelete(selectedNode)}
+                    />
+                </div>
             )}
         </div>
     );
