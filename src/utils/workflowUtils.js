@@ -1,22 +1,43 @@
 
 
-/**
- * Exporta el workflow como imagen PNG
- * @param {HTMLElement} container - El elemento contenedor del workflow
- * @param {String} filename - Nombre del archivo a descargar
- */
-export const exportAsImage = async (container, filename = 'workflow.png') => {
-    if (!container) return;
+// src/utils/exportUtils.js
+import html2canvas from 'html2canvas';
 
+/**
+ * Exporta el canvas como imagen PNG
+ * @param {HTMLElement} container - Elemento contenedor del workflow
+ * @param {string} filename - Nombre del archivo
+ * @param {Function} onSuccess - Callback en caso de éxito
+ * @param {Function} onError - Callback en caso de error
+ */
+export const exportAsImage = async (container, filename = 'workflow.png', onSuccess, onError) => {
     try {
-        // Crear un canvas a partir del contenedor
-        const canvas = await html2canvas(container, {
-            scale: 2, // Mayor calidad
+        if (!container) {
+            throw new Error('Contenedor no encontrado');
+        }
+
+        // Crear una copia del contenedor para capturar solo el canvas
+        const workflowContainer = container.querySelector('[data-workflow-canvas]') || container;
+
+        // Opciones para mejorar la calidad de la imagen
+        const options = {
+            scale: 2, // Mayor resolución
             backgroundColor: '#f9fafb',
             logging: false,
             allowTaint: true,
-            useCORS: true
-        });
+            useCORS: true,
+            // Ignorar elementos que no queremos en la captura
+            ignoreElements: (element) => {
+                return element.classList.contains('toolbar') ||
+                    element.classList.contains('sidebar') ||
+                    element.classList.contains('modal') ||
+                    element.classList.contains('notification') ||
+                    element.tagName === 'BUTTON';
+            }
+        };
+
+        // Crear canvas
+        const canvas = await html2canvas(workflowContainer, options);
 
         // Convertir a URL de datos
         const imgData = canvas.toDataURL('image/png');
@@ -25,24 +46,36 @@ export const exportAsImage = async (container, filename = 'workflow.png') => {
         const link = document.createElement('a');
         link.download = filename;
         link.href = imgData;
+
+        // Simular clic y descargar
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+
+        // Éxito
+        if (typeof onSuccess === 'function') {
+            onSuccess('Workflow exportado como imagen');
+        }
+
+        return imgData;
     } catch (error) {
         console.error('Error al exportar como imagen:', error);
-        // Mostrar notificación
-        const notification = document.createElement('div');
-        notification.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-lg';
-        notification.textContent = 'Error al exportar el workflow como imagen';
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
+
+        // Error
+        if (typeof onError === 'function') {
+            onError(`Error al exportar como imagen: ${error.message}`);
+        }
+
+        throw error;
     }
 };
 
 /**
  * Exporta el workflow como JSON
  * @param {Object} workflow - Objeto con nodos y conexiones
- * @param {String} filename - Nombre del archivo a descargar
+ * @param {string} filename - Nombre del archivo
  */
-export const exportAsJson = (workflow, filename = 'workflow.json') => {
+export const exportAsJson = (workflow, filename = 'workflow.json', onSuccess, onError) => {
     try {
         const jsonStr = JSON.stringify(workflow, null, 2);
         const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -51,61 +84,66 @@ export const exportAsJson = (workflow, filename = 'workflow.json') => {
         const link = document.createElement('a');
         link.download = filename;
         link.href = url;
+
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
 
         // Liberar URL
         setTimeout(() => URL.revokeObjectURL(url), 100);
+
+        if (typeof onSuccess === 'function') {
+            onSuccess('Workflow exportado como JSON');
+        }
+
+        return true;
     } catch (error) {
         console.error('Error al exportar como JSON:', error);
-        // Mostrar notificación
-        const notification = document.createElement('div');
-        notification.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-lg';
-        notification.textContent = 'Error al exportar el workflow como JSON';
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
+
+        if (typeof onError === 'function') {
+            onError(`Error al exportar como JSON: ${error.message}`);
+        }
+
+        throw error;
     }
 };
 
 /**
- * Importa un workflow desde un archivo JSON
- * @param {File} file - Archivo JSON a importar
- * @returns {Promise<Object>} - Objeto con nodos y conexiones
- */
-export const importFromJson = (file) => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = (event) => {
-            try {
-                const workflow = JSON.parse(event.target.result);
-                resolve(workflow);
-            } catch (error) {
-                reject(new Error('El archivo no contiene un JSON válido'));
-            }
-        };
-
-        reader.onerror = () => {
-            reject(new Error('Error al leer el archivo'));
-        };
-
-        reader.readAsText(file);
-    });
-};
-
-/**
- * Genera una URL compartible con el workflow
+ * Genera una URL compartible con el workflow codificado
  * @param {Object} workflow - Objeto con nodos y conexiones
- * @returns {String} - URL con el workflow codificado
+ * @param {Function} onSuccess - Callback en caso de éxito
+ * @param {Function} onError - Callback en caso de error
+ * @returns {string|null} - La URL generada o null en caso de error
  */
-export const generateShareableUrl = (workflow) => {
+export const generateShareableUrl = (workflow, onSuccess, onError) => {
     try {
         const jsonStr = JSON.stringify(workflow);
         const encoded = btoa(encodeURIComponent(jsonStr));
         const url = new URL(window.location.href);
         url.searchParams.set('workflow', encoded);
-        return url.toString();
+        const shareableUrl = url.toString();
+
+        // Copiar al portapapeles
+        navigator.clipboard.writeText(shareableUrl)
+            .then(() => {
+                if (typeof onSuccess === 'function') {
+                    onSuccess('URL copiada al portapapeles');
+                }
+            })
+            .catch(err => {
+                console.error('Error al copiar URL:', err);
+                // Aún devolvemos la URL aunque falló la copia
+                if (typeof onSuccess === 'function') {
+                    onSuccess('URL generada (copia manual requerida)');
+                }
+            });
+
+        return shareableUrl;
     } catch (error) {
         console.error('Error al generar URL compartible:', error);
+        if (typeof onError === 'function') {
+            onError(`Error al generar URL: ${error.message}`);
+        }
         return null;
     }
 };

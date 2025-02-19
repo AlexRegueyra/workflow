@@ -14,24 +14,19 @@ import { useHistory } from '../../hooks/useHistory';
 import { validateWorkflow } from '../../utils/workflowValidator';
 
 import {
+    alignNodes,
     exportAsImage,
     exportAsJson,
-    generateShareableUrl,
-    alignNodes
+    generateShareableUrl
 } from '../../utils/workflowUtils';
+
 
 // Importar estilos para animaciones
 import '../../styles/ConnectionAnimations.css';
-import { NotificationBellComponent, useNotifications } from '../../contexts/NotificationContext';
+import { useTelegramNotifications } from '../toolbar/Notification';
 
 const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
-    // Sistema de notificaciones
-    const { 
-        success, 
-        error, 
-        info, 
-        warning
-    } = useNotifications();
+    const { success, error, info, warning } = useTelegramNotifications();
 
     // Sistema de historial
     const {
@@ -467,44 +462,15 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
         success('Etiqueta de conexión actualizada');
     };
 
-    // Funciones para exportación/importación
-    const handleExportImage = () => {
-        try {
-            exportAsImage(containerRef.current, 'workflow.png');
-            success('Workflow exportado como imagen');
-        } catch (err) {
-            error('Error al exportar como imagen');
-            console.error(err);
-        }
-    };
-
-    const handleExportJson = () => {
-        try {
-            exportAsJson({ nodes, connections }, 'workflow.json');
-            success('Workflow exportado como JSON');
-        } catch (err) {
-            error('Error al exportar como JSON');
-            console.error(err);
-        }
-    };
-
     const handleShareUrl = () => {
-        // Usa window.location.origin para obtener la base de la URL
-        const baseUrl = window.location.origin + window.location.pathname;
         const workflowData = { nodes, connections };
-
-        try {
-            const jsonStr = JSON.stringify(workflowData);
-            const encoded = btoa(encodeURIComponent(jsonStr));
-            const url = `${baseUrl}?workflow=${encoded}`;
-
-            navigator.clipboard.writeText(url);
-            success('URL copiada al portapapeles');
-        } catch (error) {
-            console.error('Error al generar URL:', error);
-            error('Error al generar la URL compartible');
-        }
+        generateShareableUrl(
+            workflowData,
+            (message) => success(message),
+            (message) => error(message)
+        );
     };
+
 
     // Atajos de teclado
     useEffect(() => {
@@ -570,10 +536,6 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
 
     return (
         <div className="flex-1 flex">
-            {/* Campanita de notificaciones */}
-            {/* <div className="absolute top-4 right-16 z-50">
-                <NotificationBellComponent />
-            </div> */}
 
             <div
                 ref={containerRef}
@@ -635,18 +597,29 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                 {/* Toolbar secundaria */}
                 <div className="absolute top-4 right-4 flex gap-2 z-30">
                     <button
-                        onClick={handleExportImage}
+                        onClick={() => exportAsImage(
+                            containerRef.current,
+                            'workflow.png',
+                            (message) => success(message),
+                            (message) => error(message)
+                        )}
                         className="p-2 rounded bg-white hover:bg-gray-100 shadow"
                         title="Exportar como imagen"
                     >
                         <Download size={20} className="text-gray-600" />
                     </button>
+
                     <button
-                        onClick={handleExportJson}
+                        onClick={() => exportAsJson(
+                            containerRef.current,
+                            'workflow.json',
+                            (message) => success(message),
+                            (message) => error(message)
+                        )}
                         className="p-2 rounded bg-white hover:bg-gray-100 shadow"
                         title="Exportar como JSON"
                     >
-                        <Upload size={20} className="text-gray-600" />
+                        <Download size={20} className="text-gray-600" />
                     </button>
                     <button
                         onClick={handleShareUrl}
