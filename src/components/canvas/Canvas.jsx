@@ -1,6 +1,6 @@
 // Modificaciones en Canvas.jsx
 import { useState, useRef, useEffect } from 'react';
-import { Globe, Database, Mail, Undo, Redo, ZoomIn, ZoomOut, Download, Upload, Share2 } from 'lucide-react';
+import { Undo, Redo, ZoomIn, ZoomOut, Download, Share2 } from 'lucide-react';
 import ConfigPanel from '../sidebar/ConfigPanel';
 import EnhancedConnection from './EnhancedConnection';
 import Node from './Node';
