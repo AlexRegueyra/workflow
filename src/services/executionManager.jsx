@@ -1,5 +1,7 @@
 // executionManager.js
 
+import { processTransformation } from "../components/sidebar/transformerProcessor";
+
 
 /**
  * Clase que maneja la ejecución de workflows y la integración con APIs reales
@@ -719,55 +721,50 @@ export class ExecutionManager {
      */
     async executeTransformerNode(node, inputs, options = {}) {
         const config = node.data?.config || {};
-        const { transformType, transformConfig } = config;
-
-        console.log(`[Transformer] Aplicando transformación de tipo ${transformType}`);
+        console.log(`[Transformer] Aplicando transformación de tipo ${config.transformType}`);
         console.log('[DEBUG] Ejecutando transformador', {
-            transformType,
+            transformType: config.transformType,
             inputs: JSON.stringify(inputs, null, 2),
             config: JSON.stringify(config, null, 2)
         });
-
+    
         try {
-            let result;
-            switch (transformType) {
-                case 'map':
-                    // Verificar si hay configuración de mapeo
-                    if (transformConfig && transformConfig.mapping) {
-                        // Usar datos de input.default o input directo
-                        const sourceData = inputs.default || inputs;
-
-                        // Mapear propiedades según configuración
-                        result = this.mapObjectProperties(sourceData, transformConfig.mapping);
-
-                        console.log('[Transformer] Resultado del mapeo:',
-                            JSON.stringify(result, null, 2)
-                        );
-                    } else {
-                        // Si no hay configuración, devolver inputs
-                        result = inputs;
-                    }
-                    break;
-                default:
-                    result = inputs;
+            // Determinar qué datos usar para la transformación
+            let inputData = inputs;
+            
+            // Si inputs es un objeto con una propiedad 'default', usamos eso
+            if (inputs && typeof inputs === 'object' && inputs.default !== undefined) {
+                inputData = inputs.default;
             }
-
-            return {
+            
+            // Aplicar la transformación usando el procesador
+            const transformedData = processTransformation(inputData, config);
+            
+            // Construir el resultado con metadata
+            const result = {
                 success: true,
-                data: result,
-                transformType,
+                data: transformedData,
+                transformType: config.transformType,
                 metadata: {
-                    inputType: typeof inputs,
-                    outputType: typeof result,
-                    transformApplied: transformType
+                    inputType: Array.isArray(inputData) ? 'array' : typeof inputData,
+                    outputType: Array.isArray(transformedData) ? 'array' : typeof transformedData,
+                    transformApplied: config.transformType
                 }
             };
+            
+            console.log('[Transformer] Resultado de la transformación:', 
+                JSON.stringify(transformedData, null, 2).substring(0, 500) + 
+                (JSON.stringify(transformedData, null, 2).length > 500 ? '...' : '')
+            );
+            
+            return result;
         } catch (error) {
             console.error(`[Transformer] Error al aplicar transformación: ${error.message}`);
             return {
                 success: false,
                 error: error.message,
-                data: inputs
+                data: inputs,
+                metadata: { error: true }
             };
         }
     }
