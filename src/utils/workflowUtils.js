@@ -1,19 +1,34 @@
-
-
 // src/utils/exportUtils.js
 import html2canvas from 'html2canvas';
 
 /**
  * Exporta el canvas como imagen PNG
- * @param {HTMLElement} container - Elemento contenedor del workflow
+ * @param {HTMLElement|null} container - Elemento contenedor del workflow (puede ser null)
  * @param {string} filename - Nombre del archivo
  * @param {Function} onSuccess - Callback en caso de éxito
  * @param {Function} onError - Callback en caso de error
  */
 export const exportAsImage = async (container, filename = 'workflow.png', onSuccess, onError) => {
     try {
+        // Si no se proporciona un contenedor, buscar automáticamente el canvas en el DOM
         if (!container) {
-            throw new Error('Contenedor no encontrado');
+            container = document.querySelector('[data-workflow-canvas]');
+            
+            // Si aún no lo encontramos, intentar con el elemento principal del canvas
+            if (!container) {
+                container = document.querySelector('.canvas-container') || 
+                            document.querySelector('[class*="canvas"]') ||
+                            document.querySelector('[class*="workflow"]');
+            }
+            
+            // Si todavía no lo encontramos, usar todo el área principal
+            if (!container) {
+                container = document.querySelector('main') || document.body;
+            }
+        }
+
+        if (!container) {
+            throw new Error('No se pudo identificar el contenedor del workflow');
         }
 
         // Crear una copia del contenedor para capturar solo el canvas
@@ -69,15 +84,39 @@ export const exportAsImage = async (container, filename = 'workflow.png', onSucc
         throw error;
     }
 };
-
 /**
- * Exporta el workflow como JSON
+ * Exporta el workflow como JSON, manejando las referencias circulares de manera inteligente
  * @param {Object} workflow - Objeto con nodos y conexiones
  * @param {string} filename - Nombre del archivo
+ * @param {Function} onSuccess - Callback en caso de éxito
+ * @param {Function} onError - Callback en caso de error
  */
-export const exportAsJson = (workflow, filename = 'workflow.json', onSuccess, onError) => {
+export const exportAsJson = (container, filename = 'workflow.json', onSuccess, onError) => {
     try {
-        const jsonStr = JSON.stringify(workflow, null, 2);
+        // Verificar si se pasó un elemento DOM o un objeto de datos
+        let workflowData;
+        
+        if (container instanceof HTMLElement) {
+            // Si es un elemento DOM, extraer los datos del workflow desde las props asociadas
+            // En lugar de intentar serializar el DOM directamente
+            workflowData = {
+                nodes: window.workflowNodes || [],
+                connections: window.workflowConnections || [],
+                config: window.workflowConfig || {}
+            };
+        } else {
+            // Es un objeto de datos directamente, lo usamos tal cual
+            workflowData = container;
+        }
+
+        // Procesar específicamente para un workflow, manteniendo su estructura
+        const cleanWorkflow = {
+            nodes: workflowData.nodes?.map(node => cleanNode(node)) || [],
+            connections: workflowData.connections?.map(conn => cleanConnection(conn)) || [],
+            config: workflowData.config ? { ...workflowData.config } : {}
+        };
+        
+        const jsonStr = JSON.stringify(cleanWorkflow, null, 2);
         const blob = new Blob([jsonStr], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
 
@@ -109,6 +148,55 @@ export const exportAsJson = (workflow, filename = 'workflow.json', onSuccess, on
 };
 
 /**
+ * Limpia un nodo para exportación, preservando sus propiedades importantes
+ * @param {Object} node - Nodo a limpiar
+ * @returns {Object} - Nodo limpio
+ */
+function cleanNode(node) {
+    if (!node) return null;
+    
+    // Extraer solo las propiedades relevantes que no causan problemas de serialización
+    return {
+        id: node.id,
+        type: node.type,
+        name: node.name,
+        x: node.x,
+        y: node.y,
+        service: node.service ? {
+            id: node.service.id,
+            name: node.service.name,
+            category: node.service.category,
+            description: node.service.description,
+            icon: node.service.icon,
+            // Otras propiedades relevantes del servicio
+        } : null,
+        config: { ...node.config },  // Copia segura de la configuración
+        number: node.number
+        // Añadir otras propiedades importantes según sea necesario
+    };
+}
+
+/**
+ * Limpia una conexión para exportación, preservando sus propiedades importantes
+ * @param {Object} connection - Conexión a limpiar
+ * @returns {Object} - Conexión limpia
+ */
+function cleanConnection(connection) {
+    if (!connection) return null;
+    
+    return {
+        id: connection.id,
+        // Usando cleanNode para manejar los nodos de inicio y fin
+        startNode: cleanNode(connection.startNode),
+        endNode: cleanNode(connection.endNode),
+        label: connection.label || '',
+        type: connection.type || 'curved'
+        // Añadir otras propiedades importantes según sea necesario
+    };
+}
+
+
+/**
  * Genera una URL compartible con el workflow codificado
  * @param {Object} workflow - Objeto con nodos y conexiones
  * @param {Function} onSuccess - Callback en caso de éxito
@@ -117,7 +205,26 @@ export const exportAsJson = (workflow, filename = 'workflow.json', onSuccess, on
  */
 export const generateShareableUrl = (workflow, onSuccess, onError) => {
     try {
-        const jsonStr = JSON.stringify(workflow);
+        // Verificar si se pasó un elemento DOM o un objeto de datos
+        let workflowData;
+        
+        if (workflow instanceof HTMLElement) {
+            workflowData = {
+                nodes: window.workflowNodes || [],
+                connections: window.workflowConnections || [],
+                config: window.workflowConfig || {}
+            };
+        } else {
+            workflowData = workflow;
+        }
+
+        // Limpiar el workflow usando nuestras funciones específicas
+        const cleanWorkflow = {
+            nodes: workflowData.nodes?.map(node => cleanNode(node)) || [],
+            connections: workflowData.connections?.map(conn => cleanConnection(conn)) || []
+        };
+        
+        const jsonStr = JSON.stringify(cleanWorkflow);
         const encoded = btoa(encodeURIComponent(jsonStr));
         const url = new URL(window.location.href);
         url.searchParams.set('workflow', encoded);
