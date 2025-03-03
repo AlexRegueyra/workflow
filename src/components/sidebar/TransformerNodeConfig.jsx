@@ -1,11 +1,49 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import JSONEditor from '../../utils/JSONEditor'; // Importamos el componente JSONEditor
 
-const TransformerNodeConfig = ({ node, onChange }) => {
+const TransformerNodeConfig = ({ node, onChange, previousNodeData }) => {
     // Asegurar que tenemos la estructura correcta con valores por defecto
     const config = node.config || {};
     const transformConfig = config.transformConfig || {};
     const transformType = config.transformType || 'map';
+
+    // Generar configuraciones por defecto según el tipo de transformación
+    const getDefaultConfig = (type) => {
+        switch (type) {
+            case 'filter':
+                return {
+                    field: '',
+                    operator: 'equals',
+                    value: ''
+                };
+            case 'map':
+                return {
+                    mapping: {}
+                };
+            case 'reduce':
+                return {
+                    field: '',
+                    operation: 'sum', // Valor por defecto para evitar errores
+                    initialValue: '0'
+                };
+            case 'aggregate':
+                return {
+                    field: '',
+                    method: 'count' // Valor por defecto para evitar errores
+                };
+            case 'pick':
+                return {
+                    fields: [] // Array vacío por defecto, no un objeto
+                };
+            case 'flatten':
+                return {
+                    depth: 1
+                };
+            default:
+                return {};
+        }
+    };
 
     // Función para actualizar la configuración del nodo
     const handleConfigChange = (updates) => {
@@ -18,12 +56,35 @@ const TransformerNodeConfig = ({ node, onChange }) => {
         });
     };
 
+    // Obtener una vista previa de los datos previos
+    const renderPreviousDataPreview = () => {
+        if (!previousNodeData) return null;
+
+        let previewData = previousNodeData;
+        // Si hay muchos datos, mostrar solo una muestra
+        if (Array.isArray(previousNodeData) && previousNodeData.length > 3) {
+            previewData = previousNodeData.slice(0, 3);
+            previewData.push({ _note: `... y ${previousNodeData.length - 3} elementos más` });
+        }
+
+        return (
+            <div className="mb-4 p-3 bg-gray-50 rounded-md border border-gray-200">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Datos recibidos del nodo anterior:</h3>
+                <pre className="text-xs overflow-auto max-h-40 p-2 bg-gray-100 rounded">
+                    {JSON.stringify(previewData, null, 2)}
+                </pre>
+            </div>
+        );
+    };
+
     // Renderizar campos específicos según el tipo de transformación
     const renderTransformConfigFields = () => {
         switch (transformType) {
             case 'filter':
                 return (
                     <>
+                        {renderPreviousDataPreview()}
+
                         <div className="form-group">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Campo</label>
                             <input
@@ -80,36 +141,34 @@ const TransformerNodeConfig = ({ node, onChange }) => {
 
             case 'map':
                 return (
-                    <div className="form-group">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Configuración de mapeo (JSON)
-                        </label>
-                        <textarea
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-                            value={JSON.stringify(transformConfig.mapping || {}, null, 2)}
-                            onChange={(e) => {
-                                try {
-                                    const mapping = JSON.parse(e.target.value);
-                                    handleConfigChange({
-                                        transformConfig: {
-                                            ...transformConfig,
-                                            mapping
-                                        }
-                                    });
-                                } catch (error) {
-                                    // Manejar error de parsing
-                                    console.error('Error parsing JSON', error);
-                                }
-                            }}
-                            placeholder='{"nuevoNombre": "campoOriginal"}'
-                            rows={5}
-                        />
-                    </div>
+                    <>
+                        {renderPreviousDataPreview()}
+
+                        <div className="form-group">
+                            <JSONEditor
+                                label="Configuración de mapeo (JSON)"
+                                value={transformConfig.mapping || {}}
+                                onChange={(mapping) => handleConfigChange({
+                                    transformConfig: {
+                                        ...transformConfig,
+                                        mapping
+                                    }
+                                })}
+                                placeholder='{"nuevoNombre": "campoOriginal"}'
+                                height="min-h-[120px]"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                                Ejemplo: {"{'nuevoNombre': 'data.campoOriginal', 'total': 'data.precio * data.cantidad'}"}
+                            </p>
+                        </div>
+                    </>
                 );
 
             case 'reduce':
                 return (
                     <>
+                        {renderPreviousDataPreview()}
+
                         <div className="form-group">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Campo</label>
                             <input
@@ -122,7 +181,7 @@ const TransformerNodeConfig = ({ node, onChange }) => {
                                         field: e.target.value
                                     }
                                 })}
-                                placeholder="Campo a reducir"
+                                placeholder="Campo a reducir (ej: data.cantidad)"
                             />
                         </div>
 
@@ -167,6 +226,8 @@ const TransformerNodeConfig = ({ node, onChange }) => {
             case 'aggregate':
                 return (
                     <>
+                        {renderPreviousDataPreview()}
+
                         <div className="form-group">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Campo de agregación</label>
                             <input
@@ -179,7 +240,7 @@ const TransformerNodeConfig = ({ node, onChange }) => {
                                         field: e.target.value
                                     }
                                 })}
-                                placeholder="Campo para agregar"
+                                placeholder="Campo para agregar (ej: data.username)"
                             />
                         </div>
 
@@ -206,68 +267,79 @@ const TransformerNodeConfig = ({ node, onChange }) => {
 
             case 'pick':
                 return (
-                    <div className="form-group">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Campos a seleccionar</label>
-                        <textarea
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-                            value={JSON.stringify(transformConfig.fields || [], null, 2)}
-                            onChange={(e) => {
-                                try {
-                                    const fields = JSON.parse(e.target.value);
+                    <>
+                        {renderPreviousDataPreview()}
+
+                        <div className="form-group">
+                            <JSONEditor
+                                label="Campos a seleccionar (Array)"
+                                value={transformConfig.fields || []}
+                                onChange={(fields) => {
+                                    // Asegurar que fields es un array y no está vacío
+                                    const validFields = Array.isArray(fields) ? fields : [];
+
+                                    // Si el array está vacío, añadir un campo de ejemplo
+                                    if (validFields.length === 0) {
+                                        validFields.push("data.monto");
+                                    }
+
                                     handleConfigChange({
                                         transformConfig: {
                                             ...transformConfig,
-                                            fields
+                                            fields: validFields
                                         }
                                     });
-                                } catch (error) {
-                                    console.error('Error parsing JSON', error);
-                                }
-                            }}
-                            placeholder='["campo1", "campo2"]'
-                            rows={5}
-                        />
-                    </div>
+                                }}
+                                placeholder='["campo1", "campo2"]'
+                                height="min-h-[120px]"
+                            />
+                            {(transformConfig.fields || []).length === 0 && (
+                                <p className="mt-1 text-xs text-red-500">
+                                    ⚠️ Debes especificar al menos un campo para seleccionar
+                                </p>
+                            )}
+                        </div>
+                    </>
                 );
 
             case 'flatten':
                 return (
-                    <div className="form-group">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de aplanamiento</label>
-                        <input
-                            type="number"
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            value={transformConfig.depth || 1}
-                            onChange={(e) => handleConfigChange({
-                                transformConfig: {
-                                    ...transformConfig,
-                                    depth: parseInt(e.target.value, 10)
-                                }
-                            })}
-                            placeholder="Nivel de aplanamiento (default: 1)"
-                            min="1"
-                        />
-                    </div>
+                    <>
+                        {renderPreviousDataPreview()}
+
+                        <div className="form-group">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de aplanamiento</label>
+                            <input
+                                type="number"
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                value={transformConfig.depth || 1}
+                                onChange={(e) => handleConfigChange({
+                                    transformConfig: {
+                                        ...transformConfig,
+                                        depth: parseInt(e.target.value, 10)
+                                    }
+                                })}
+                                placeholder="Nivel de aplanamiento (default: 1)"
+                                min="1"
+                            />
+                        </div>
+                    </>
                 );
 
             default:
                 return (
-                    <div className="form-group">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Configuración JSON</label>
-                        <textarea
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-                            value={JSON.stringify(transformConfig, null, 2)}
-                            onChange={(e) => {
-                                try {
-                                    const configObj = JSON.parse(e.target.value);
-                                    handleConfigChange({ transformConfig: configObj });
-                                } catch (error) {
-                                    console.error('Error parsing JSON', error);
-                                }
-                            }}
-                            rows={5}
-                        />
-                    </div>
+                    <>
+                        {renderPreviousDataPreview()}
+
+                        <div className="form-group">
+                            <JSONEditor
+                                label="Configuración JSON"
+                                value={transformConfig}
+                                onChange={(configObj) => handleConfigChange({ transformConfig: configObj })}
+                                height="min-h-[150px]"
+                            />
+                        </div>
+                    </>
                 );
         }
     };
@@ -279,11 +351,17 @@ const TransformerNodeConfig = ({ node, onChange }) => {
                 <select
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     value={transformType}
-                    onChange={(e) => handleConfigChange({ 
-                        transformType: e.target.value,
-                        // Resetear la configuración cuando cambia el tipo de transformación
-                        transformConfig: {} 
-                    })}
+                    onChange={(e) => {
+                        const newType = e.target.value;
+                        // Obtener configuración por defecto para el nuevo tipo
+                        const defaultConfig = getDefaultConfig(newType);
+
+                        // Actualizar con el nuevo tipo y la configuración por defecto
+                        handleConfigChange({
+                            transformType: newType,
+                            transformConfig: defaultConfig
+                        });
+                    }}
                 >
                     <option value="filter">Filtrar</option>
                     <option value="map">Mapear</option>
@@ -307,7 +385,8 @@ TransformerNodeConfig.propTypes = {
             transformConfig: PropTypes.object
         })
     }).isRequired,
-    onChange: PropTypes.func.isRequired
+    onChange: PropTypes.func.isRequired,
+    previousNodeData: PropTypes.any // Datos del nodo anterior
 };
 
 export default TransformerNodeConfig;
