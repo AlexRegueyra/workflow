@@ -1,620 +1,54 @@
-// // import { useState, useEffect } from 'react';
-// // import Toolbar from './components/toolbar/Toolbar';
-// // import ServicesSidebar from './components/sidebar/ServicesSidebar';
-// // import Canvas from './components/canvas/Canvas';
-// // import SettingsModal from './components/modal/SettingsModal';
-// // import HistoryModal from './components/modal/HistoryModal';
-// // import PreviewPanel from './components/preview/PreviewPanel';
-
-// // function App() {
-// //     // Estados para el workflow
-// //     const [workflowNodes, setWorkflowNodes] = useState([]);
-// //     const [workflowConnections, setWorkflowConnections] = useState([]);
-// //     const [workflowConfig, setWorkflowConfig] = useState({
-// //         name: 'Nuevo Workflow',
-// //         interval: '15m',
-// //         status: 'ready', // ready, running, error
-// //         lastSaved: null,
-// //         notifications: {
-// //             onSuccess: true,
-// //             onError: true
-// //         }
-// //     });
-// //     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-// //     const [executionHistory, setExecutionHistory] = useState([]);
-// //     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-
-// //     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-// // const [executionData, setExecutionData] = useState([]);
-// // const [currentExecutingNode, setCurrentExecutingNode] = useState(null);
-// //     // Cargar workflow guardado al iniciar
-// //     useEffect(() => {
-// //         const savedWorkflow = localStorage.getItem('current-workflow');
-// //         if (savedWorkflow) {
-// //             try {
-// //                 const { nodes, connections, config } = JSON.parse(savedWorkflow);
-// //                 setWorkflowNodes(nodes || []);
-// //                 setWorkflowConnections(connections || []);
-// //                 if (config) {
-// //                     setWorkflowConfig(prev => ({
-// //                         ...prev,
-// //                         ...config,
-// //                         status: 'ready'
-// //                     }));
-// //                 }
-// //             } catch (error) {
-// //                 console.error('Error al cargar el workflow:', error);
-// //             }
-// //         }
-// //     }, []);
-
-// //     // Función para mostrar notificaciones
-// //     const showNotification = (message, type = 'success') => {
-// //         const notification = document.createElement('div');
-// //         notification.className = `fixed bottom-4 right-4 px-4 py-2 rounded-md shadow-lg ${type === 'success' ? 'bg-green-500' : 'bg-red-500'
-// //             } text-white`;
-// //         notification.textContent = message;
-// //         document.body.appendChild(notification);
-// //         setTimeout(() => notification.remove(), 3000);
-// //     };
-
-// //     // Manejadores para la Toolbar
-// //     const handleExecute = async () => {
-// //         const errors = validateWorkflow();
-        
-// //         if (errors.length > 0) {
-// //             showNotification(errors[0], 'error');
-// //             return;
-// //         }
-    
-// //         setWorkflowConfig(prev => ({ ...prev, status: 'running' }));
-// //         setIsPreviewOpen(true);
-        
-// //         // Inicializar datos de ejecución
-// //         const initialExecutionData = workflowNodes.map(node => ({
-// //             ...node,
-// //             status: 'pending',
-// //             output: null,
-// //             error: null,
-// //             duration: null
-// //         }));
-// //         setExecutionData(initialExecutionData);
-    
-// //         // Simular ejecución de cada nodo
-// //         for (const node of workflowNodes) {
-// //             setCurrentExecutingNode(node);
-            
-// //             // Actualizar estado a 'running'
-// //             setExecutionData(prev => prev.map(n => 
-// //                 n.id === node.id ? { ...n, status: 'running' } : n
-// //             ));
-    
-// //             // Simular procesamiento
-// //             await new Promise(resolve => setTimeout(resolve, 1500));
-    
-// //             // Simular resultado (éxito o error)
-// //             const success = Math.random() > 0.2;
-// //             const duration = Math.floor(Math.random() * 1000) + 500;
-    
-// //             if (success) {
-// //                 // Simular salida según tipo de nodo
-// //                 let output;
-// //                 switch (node.type) {
-// //                     case 'api_rest':
-// //                         output = { status: 200, data: { message: 'Success' } };
-// //                         break;
-// //                     case 'database':
-// //                         output = { rows: [{ id: 1, name: 'Test' }] };
-// //                         break;
-// //                     case 'email':
-// //                         output = { sent: true, recipient: 'test@example.com' };
-// //                         break;
-// //                     default:
-// //                         output = { success: true };
-// //                 }
-    
-// //                 setExecutionData(prev => prev.map(n => 
-// //                     n.id === node.id ? { 
-// //                         ...n, 
-// //                         status: 'success',
-// //                         output,
-// //                         duration 
-// //                     } : n
-// //                 ));
-// //             } else {
-// //                 setExecutionData(prev => prev.map(n => 
-// //                     n.id === node.id ? { 
-// //                         ...n, 
-// //                         status: 'error',
-// //                         error: 'Error en la ejecución',
-// //                         duration 
-// //                     } : n
-// //                 ));
-// //                 break; // Detener ejecución en caso de error
-// //             }
-// //         }
-    
-// //         setCurrentExecutingNode(null);
-// //         setWorkflowConfig(prev => ({ ...prev, status: 'ready' }));
-    
-// //         // Actualizar historial
-// //         const newExecution = {
-// //             id: executionHistory.length + 1,
-// //             timestamp: new Date().toISOString(),
-// //             status: executionData.every(node => node.status === 'success') ? 'success' : 'error',
-// //             duration: executionData.reduce((sum, node) => sum + (node.duration || 0), 0),
-// //             nodesExecuted: workflowNodes.length
-// //         };
-// //         setExecutionHistory(prev => [newExecution, ...prev]);
-// //     };
-
-// //     const validateWorkflow = () => {
-// //         const errors = [];
-
-// //         // Validar que haya nodos
-// //         if (workflowNodes.length === 0) {
-// //             errors.push('El workflow debe tener al menos un nodo');
-// //         }
-
-// //         // Validar conexiones
-// //         if (workflowNodes.length > 1 && workflowConnections.length === 0) {
-// //             errors.push('Los nodos deben estar conectados');
-// //         }
-
-// //         // Validar configuración de nodos
-// //         workflowNodes.forEach(node => {
-// //             if (!node.config || Object.keys(node.config).length === 0) {
-// //                 errors.push(`El nodo "${node.name}" no está configurado`);
-// //             }
-// //         });
-
-// //         return errors;
-// //     };
-// //     const handleSave = () => {
-// //         try {
-// //             const workflow = {
-// //                 nodes: workflowNodes,
-// //                 connections: workflowConnections,
-// //                 config: {
-// //                     ...workflowConfig,
-// //                     lastSaved: new Date().toISOString()
-// //                 }
-// //             };
-// //             localStorage.setItem('current-workflow', JSON.stringify(workflow));
-
-// //             setWorkflowConfig(prev => ({
-// //                 ...prev,
-// //                 lastSaved: new Date().toISOString()
-// //             }));
-
-// //             showNotification('Workflow guardado correctamente');
-// //         } catch (error) {
-// //             console.error('Error al guardar:', error);
-// //             showNotification('Error al guardar el workflow', 'error');
-// //         }
-// //     };
-
-// //     // Manejadores para el SettingsModal
-// //     const handleImport = (importedWorkflow) => {
-// //         try {
-// //             setWorkflowNodes(importedWorkflow.nodes || []);
-// //             setWorkflowConnections(importedWorkflow.connections || []);
-// //             if (importedWorkflow.config) {
-// //                 setWorkflowConfig(prev => ({
-// //                     ...prev,
-// //                     ...importedWorkflow.config,
-// //                     status: 'ready'
-// //                 }));
-// //             }
-// //             handleSave();
-// //             setIsSettingsOpen(false);
-// //             showNotification('Workflow importado correctamente');
-// //         } catch (error) {
-// //             console.error('Error al importar:', error);
-// //             showNotification('Error al importar el workflow', 'error');
-// //         }
-// //     };
-
-// //     const handleClear = () => {
-// //         setWorkflowNodes([]);
-// //         setWorkflowConnections([]);
-// //         setWorkflowConfig(prev => ({
-// //             ...prev,
-// //             name: 'Nuevo Workflow',
-// //             lastSaved: null
-// //         }));
-// //         localStorage.removeItem('current-workflow');
-// //         setIsSettingsOpen(false);
-// //         showNotification('Workflow limpiado correctamente');
-// //     };
-
-// //     // Manejador para actualizaciones del Canvas
-// //     const handleWorkflowUpdate = ({ nodes, connections }) => {
-// //         setWorkflowNodes(nodes);
-// //         setWorkflowConnections(connections);
-// //     };
-
-// //     return (
-// //         <div className="h-screen flex flex-col">
-// //             <Toolbar
-// //                 name={workflowConfig.name}
-// //                 status={workflowConfig.status}
-// //                 interval={workflowConfig.interval}
-// //                 onIntervalChange={(interval) =>
-// //                     setWorkflowConfig(prev => ({ ...prev, interval }))
-// //                 }
-// //                 onExecute={handleExecute}
-// //                 onSave={handleSave}
-// //                 onSettingsClick={() => setIsSettingsOpen(true)}
-// //                 onHistoryClick={() => setIsHistoryOpen(true)}
-// //                 lastSaved={workflowConfig.lastSaved}
-// //             />
-// //             <div className="flex-1 flex overflow-hidden">
-// //                 <ServicesSidebar />
-// //                 <div className="flex-1 flex">
-// //                     <Canvas
-// //                         initialNodes={workflowNodes}
-// //                         initialConnections={workflowConnections}
-// //                         onSave={handleWorkflowUpdate}
-// //                     />
-// //                     {isPreviewOpen && (
-// //                         <PreviewPanel
-// //                             isOpen={isPreviewOpen}
-// //                             onClose={() => setIsPreviewOpen(false)}
-// //                             executionData={executionData}
-// //                             currentNode={currentExecutingNode}
-// //                         />
-// //                     )}
-// //                 </div>
-// //             </div>
-// //             <SettingsModal
-// //                 isOpen={isSettingsOpen}
-// //                 onClose={() => setIsSettingsOpen(false)}
-// //                 config={workflowConfig}
-// //                 onSave={(newConfig) => {
-// //                     setWorkflowConfig(newConfig);
-// //                     handleSave();
-// //                 }}
-// //                 onImport={handleImport}
-// //                 onClear={handleClear}
-// //             />
-// //             <HistoryModal
-// //                 isOpen={isHistoryOpen}
-// //                 onClose={() => setIsHistoryOpen(false)}
-// //                 history={executionHistory}
-// //             />
-// //         </div>
-// //     );
-// // }
-
-// // export default App;
-
-// import { useState, useEffect } from 'react';
-// import Toolbar from './components/toolbar/Toolbar';
-// import ServicesSidebar from './components/sidebar/ServicesSidebar';
-// import Canvas from './components/canvas/Canvas';
-// import SettingsModal from './components/modal/SettingsModal';
-// import HistoryModal from './components/modal/HistoryModal';
-// import PreviewPanel from './components/preview/PreviewPanel';
-// import useNotificationBell from './components/toolbar/NotificationBell';
-
-// function App() {
-//     // Sistema de notificaciones
-//     const { 
-//         success, 
-//         error, 
-//         info, 
-//         warning, 
-//         NotificationBell 
-//     } = useNotificationBell();
-
-//     // Estados para el workflow
-//     const [workflowNodes, setWorkflowNodes] = useState([]);
-//     const [workflowConnections, setWorkflowConnections] = useState([]);
-//     const [workflowConfig, setWorkflowConfig] = useState({
-//         name: 'Nuevo Workflow',
-//         interval: '15m',
-//         status: 'ready', // ready, running, error
-//         lastSaved: null,
-//         notifications: {
-//             onSuccess: true,
-//             onError: true
-//         }
-//     });
-//     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-//     const [executionHistory, setExecutionHistory] = useState([]);
-//     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-
-//     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-//     const [executionData, setExecutionData] = useState([]);
-//     const [currentExecutingNode, setCurrentExecutingNode] = useState(null);
-    
-//     // Cargar workflow guardado al iniciar
-//     useEffect(() => {
-//         const savedWorkflow = localStorage.getItem('current-workflow');
-//         if (savedWorkflow) {
-//             try {
-//                 const { nodes, connections, config } = JSON.parse(savedWorkflow);
-//                 setWorkflowNodes(nodes || []);
-//                 setWorkflowConnections(connections || []);
-//                 if (config) {
-//                     setWorkflowConfig(prev => ({
-//                         ...prev,
-//                         ...config,
-//                         status: 'ready'
-//                     }));
-//                 }
-//                 info('Workflow cargado correctamente');
-//             } catch (error) {
-//                 console.error('Error al cargar el workflow:', error);
-//                 error('Error al cargar el workflow guardado');
-//             }
-//         }
-//     }, []);
-
-//     // Manejadores para la Toolbar
-//     const handleExecute = async () => {
-//         const errors = validateWorkflow();
-        
-//         if (errors.length > 0) {
-//             warning(errors[0]);
-//             return;
-//         }
-    
-//         setWorkflowConfig(prev => ({ ...prev, status: 'running' }));
-//         setIsPreviewOpen(true);
-        
-//         // Inicializar datos de ejecución
-//         const initialExecutionData = workflowNodes.map(node => ({
-//             ...node,
-//             status: 'pending',
-//             output: null,
-//             error: null,
-//             duration: null
-//         }));
-//         setExecutionData(initialExecutionData);
-    
-//         // Simular ejecución de cada nodo
-//         for (const node of workflowNodes) {
-//             setCurrentExecutingNode(node);
-            
-//             // Actualizar estado a 'running'
-//             setExecutionData(prev => prev.map(n => 
-//                 n.id === node.id ? { ...n, status: 'running' } : n
-//             ));
-    
-//             // Simular procesamiento
-//             await new Promise(resolve => setTimeout(resolve, 1500));
-    
-//             // Simular resultado (éxito o error)
-//             const succeeds = Math.random() > 0.2;
-//             const duration = Math.floor(Math.random() * 1000) + 500;
-    
-//             if (succeeds) {
-//                 // Simular salida según tipo de nodo
-//                 let output;
-//                 switch (node.type) {
-//                     case 'api_rest':
-//                         output = { status: 200, data: { message: 'Success' } };
-//                         break;
-//                     case 'database':
-//                         output = { rows: [{ id: 1, name: 'Test' }] };
-//                         break;
-//                     case 'email':
-//                         output = { sent: true, recipient: 'test@example.com' };
-//                         break;
-//                     default:
-//                         output = { success: true };
-//                 }
-    
-//                 setExecutionData(prev => prev.map(n => 
-//                     n.id === node.id ? { 
-//                         ...n, 
-//                         status: 'success',
-//                         output,
-//                         duration 
-//                     } : n
-//                 ));
-                
-//                 info(`Nodo "${node.name}" ejecutado correctamente`);
-//             } else {
-//                 setExecutionData(prev => prev.map(n => 
-//                     n.id === node.id ? { 
-//                         ...n, 
-//                         status: 'error',
-//                         error: 'Error en la ejecución',
-//                         duration 
-//                     } : n
-//                 ));
-                
-//                 error(`Error en la ejecución del nodo "${node.name}"`);
-//                 break; // Detener ejecución en caso de error
-//             }
-//         }
-    
-//         setCurrentExecutingNode(null);
-//         setWorkflowConfig(prev => ({ ...prev, status: 'ready' }));
-    
-//         // Actualizar historial
-//         const newExecution = {
-//             id: executionHistory.length + 1,
-//             timestamp: new Date().toISOString(),
-//             status: executionData.every(node => node.status === 'success') ? 'success' : 'error',
-//             duration: executionData.reduce((sum, node) => sum + (node.duration || 0), 0),
-//             nodesExecuted: workflowNodes.length
-//         };
-//         setExecutionHistory(prev => [newExecution, ...prev]);
-        
-//         if (newExecution.status === 'success') {
-//             success('Workflow ejecutado correctamente');
-//         } else {
-//             error('Error al ejecutar el workflow');
-//         }
-//     };
-
-//     const validateWorkflow = () => {
-//         const errors = [];
-
-//         // Validar que haya nodos
-//         if (workflowNodes.length === 0) {
-//             errors.push('El workflow debe tener al menos un nodo');
-//         }
-
-//         // Validar conexiones
-//         if (workflowNodes.length > 1 && workflowConnections.length === 0) {
-//             errors.push('Los nodos deben estar conectados');
-//         }
-
-//         // Validar configuración de nodos
-//         workflowNodes.forEach(node => {
-//             if (!node.config || Object.keys(node.config).length === 0) {
-//                 errors.push(`El nodo "${node.name}" no está configurado`);
-//             }
-//         });
-
-//         return errors;
-//     };
-    
-//     const handleSave = () => {
-//         try {
-//             const workflow = {
-//                 nodes: workflowNodes,
-//                 connections: workflowConnections,
-//                 config: {
-//                     ...workflowConfig,
-//                     lastSaved: new Date().toISOString()
-//                 }
-//             };
-//             localStorage.setItem('current-workflow', JSON.stringify(workflow));
-
-//             setWorkflowConfig(prev => ({
-//                 ...prev,
-//                 lastSaved: new Date().toISOString()
-//             }));
-
-//             success('Workflow guardado correctamente');
-//         } catch (error) {
-//             console.error('Error al guardar:', error);
-//             error('Error al guardar el workflow');
-//         }
-//     };
-
-//     // Manejadores para el SettingsModal
-//     const handleImport = (importedWorkflow) => {
-//         try {
-//             setWorkflowNodes(importedWorkflow.nodes || []);
-//             setWorkflowConnections(importedWorkflow.connections || []);
-//             if (importedWorkflow.config) {
-//                 setWorkflowConfig(prev => ({
-//                     ...prev,
-//                     ...importedWorkflow.config,
-//                     status: 'ready'
-//                 }));
-//             }
-//             handleSave();
-//             setIsSettingsOpen(false);
-//             success('Workflow importado correctamente');
-//         } catch (error) {
-//             console.error('Error al importar:', error);
-//             error('Error al importar el workflow');
-//         }
-//     };
-
-//     const handleClear = () => {
-//         setWorkflowNodes([]);
-//         setWorkflowConnections([]);
-//         setWorkflowConfig(prev => ({
-//             ...prev,
-//             name: 'Nuevo Workflow',
-//             lastSaved: null
-//         }));
-//         localStorage.removeItem('current-workflow');
-//         setIsSettingsOpen(false);
-//         info('Workflow limpiado correctamente');
-//     };
-
-//     // Manejador para actualizaciones del Canvas
-//     const handleWorkflowUpdate = ({ nodes, connections }) => {
-//         setWorkflowNodes(nodes);
-//         setWorkflowConnections(connections);
-//     };
-
-//     return (
-//         <div className="h-screen flex flex-col">
-//             <Toolbar
-//                 name={workflowConfig.name}
-//                 status={workflowConfig.status}
-//                 interval={workflowConfig.interval}
-//                 onIntervalChange={(interval) =>
-//                     setWorkflowConfig(prev => ({ ...prev, interval }))
-//                 }
-//                 onExecute={handleExecute}
-//                 onSave={handleSave}
-//                 onSettingsClick={() => setIsSettingsOpen(true)}
-//                 onHistoryClick={() => setIsHistoryOpen(true)}
-//                 lastSaved={workflowConfig.lastSaved}
-//                 notificationBell={<NotificationBell />}
-//             />
-//             <div className="flex-1 flex overflow-hidden">
-//                 <ServicesSidebar />
-//                 <div className="flex-1 flex">
-//                     <Canvas
-//                         initialNodes={workflowNodes}
-//                         initialConnections={workflowConnections}
-//                         onSave={handleWorkflowUpdate}
-//                     />
-//                     {isPreviewOpen && (
-//                         <PreviewPanel
-//                             isOpen={isPreviewOpen}
-//                             onClose={() => setIsPreviewOpen(false)}
-//                             executionData={executionData}
-//                             currentNode={currentExecutingNode}
-//                         />
-//                     )}
-//                 </div>
-//             </div>
-//             <SettingsModal
-//                 isOpen={isSettingsOpen}
-//                 onClose={() => setIsSettingsOpen(false)}
-//                 config={workflowConfig}
-//                 onSave={(newConfig) => {
-//                     setWorkflowConfig(newConfig);
-//                     handleSave();
-//                 }}
-//                 onImport={handleImport}
-//                 onClear={handleClear}
-//             />
-//             <HistoryModal
-//                 isOpen={isHistoryOpen}
-//                 onClose={() => setIsHistoryOpen(false)}
-//                 history={executionHistory}
-//             />
-//         </div>
-//     );
-// }
-
-// export default App;
-
-import { useState, useEffect } from 'react';
+// App.js modificado con integración de nuevos servicios
+import { useState, useEffect, useRef } from 'react';
 import Toolbar from './components/toolbar/Toolbar';
 import ServicesSidebar from './components/sidebar/ServicesSidebar';
 import Canvas from './components/canvas/Canvas';
 import SettingsModal from './components/modal/SettingsModal';
 import HistoryModal from './components/modal/HistoryModal';
-import PreviewPanel from './components/preview/PreviewPanel';
-// import { exportAsImage, exportAsJson } from './utils/exportUtils';
+// Reemplazamos la importación directa del PreviewPanel
+// import PreviewPanel from './components/preview/PreviewPanel';
+// Y en su lugar importamos el ExecutionController que a su vez usa el PreviewPanel mejorado
+import ExecutionController from './components/preview/ExecutionController'; 
+
 import { useTelegramNotifications } from './components/toolbar/Notification';
-import ApiService from './services/api';
-import { exportAsImage,exportAsJson } from './utils/workflowUtils';
+import { exportAsImage, exportAsJson } from './utils/workflowUtils';
+
+// Importar nuevos servicios
+import { WorkflowProvider, useWorkflow } from './services/WorkflowContext';
+import { ExecutionManager } from './services/executionManager';
+
+
+// Wrapper principal que proporciona el contexto
+function WorkflowApp() {
+    return (
+        <WorkflowProvider>
+            <App />
+        </WorkflowProvider>
+    );
+}
 
 function App() {
+    // Acceder al contexto de workflow
+    const {
+        executeWorkflow,
+        cancelExecution,
+        isExecuting,
+        progress,
+        activeNodeId,
+        executionResults,
+        executionLog,
+        error: workflowError,
+        validateWorkflow: validateWorkflowContext,
+        clearExecutionResults
+    } = useWorkflow();
+
     // Sistema de notificaciones estilo Telegram
-    const { 
-        success, 
-        error, 
-        info, 
-        warning, 
-        NotificationBell 
+    const {
+        success,
+        error,
+        info,
+        warning,
+        NotificationBell
     } = useTelegramNotifications();
 
     // Estados para el workflow
@@ -635,10 +69,24 @@ function App() {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    // Mantener estos estados para compatibilidad con el código existente
     const [executionData, setExecutionData] = useState([]);
     const [currentExecutingNode, setCurrentExecutingNode] = useState(null);
-    const canvasRef = useState(null);
-    
+    const canvasRef = useRef(null);
+
+    // Execution manager para operaciones avanzadas
+    const executionManagerRef = useRef(null);
+
+    // ID único para el workflow actual
+    const [workflowId, setWorkflowId] = useState(`workflow_${Date.now()}`);
+
+    // Inicializar execution manager
+    useEffect(() => {
+        if (!executionManagerRef.current) {
+            executionManagerRef.current = new ExecutionManager();
+        }
+    }, []);
+
     // Cargar workflow guardado al iniciar
     useEffect(() => {
         const savedWorkflow = localStorage.getItem('current-workflow');
@@ -662,18 +110,70 @@ function App() {
         }
     }, []);
 
+    // Efectos para actualizar la UI basado en estado de ejecución
+    useEffect(() => {
+        if (isExecuting) {
+            setWorkflowConfig(prev => ({ ...prev, status: 'running' }));
+        } else {
+            setWorkflowConfig(prev => ({ ...prev, status: 'ready' }));
+        }
+    }, [isExecuting]);
+
+    // Efecto para manejar nodo activo durante ejecución
+    useEffect(() => {
+        setCurrentExecutingNode(
+            workflowNodes.find(node => node.id === activeNodeId) || null
+        );
+    }, [activeNodeId, workflowNodes]);
+
+    // Efecto para actualizar datos de ejecución cuando cambian los resultados
+    useEffect(() => {
+        if (executionResults && Object.keys(executionResults).length > 0) {
+            const updatedExecutionData = workflowNodes.map(node => {
+                const nodeResult = executionResults[node.id];
+                const nodeLog = executionLog.filter(log => log.nodeId === node.id);
+                const lastLog = nodeLog[nodeLog.length - 1];
+
+                let status = 'pending';
+                if (lastLog) {
+                    if (lastLog.status === 'COMPLETED') status = 'success';
+                    else if (lastLog.status === 'ERROR') status = 'error';
+                    else if (lastLog.status === 'STARTED') status = 'running';
+                }
+
+                return {
+                    ...node,
+                    status,
+                    output: nodeResult || null,
+                    error: lastLog?.error || null,
+                    duration: lastLog?.duration || null
+                };
+            });
+
+            setExecutionData(updatedExecutionData);
+        }
+    }, [executionResults, executionLog, workflowNodes]);
+
+    // Efecto para mostrar errores de workflow
+    useEffect(() => {
+        if (workflowError) {
+            error(`Error en el workflow: ${workflowError}`);
+        }
+    }, [workflowError]);
+
     // Manejadores para la Toolbar
     const handleExecute = async () => {
-        const errors = validateWorkflow();
-        
-        if (errors.length > 0) {
-            warning(errors[0]);
+        // Validar workflow usando nuestro propio validador
+        const validationResult = validateWorkflow();
+
+        if (validationResult.errors.length > 0) {
+            warning(validationResult.errors[0]);
             return;
         }
-    
-        setWorkflowConfig(prev => ({ ...prev, status: 'running' }));
+
+        // Abrir panel de preview
         setIsPreviewOpen(true);
-        
+
         // Inicializar datos de ejecución
         const initialExecutionData = workflowNodes.map(node => ({
             ...node,
@@ -683,150 +183,159 @@ function App() {
             duration: null
         }));
         setExecutionData(initialExecutionData);
-    
-        // Ejecutar cada nodo
-        for (const node of workflowNodes) {
-            setCurrentExecutingNode(node);
-            
-            // Actualizar estado a 'running'
-            setExecutionData(prev => prev.map(n => 
-                n.id === node.id ? { ...n, status: 'running' } : n
-            ));
-    
-            try {
-                // Tiempo inicial
-                const startTime = Date.now();
-                
-                // Ejecutar el nodo según su tipo
-                let output;
-                if (node.type === 'api_rest' && node.config?.url) {
-                    // Ejecutar llamada a API real
-                    info(`Ejecutando API: ${node.config.url}`);
-                    
-                    const method = node.config.method || 'GET';
-                    const headers = node.config.headers || {};
-                    const params = node.config.params || {};
-                    const body = node.config.body || {};
-                    
-                    const response = await ApiService.request({
-                        url: node.config.url,
-                        method,
-                        headers,
-                        params: method === 'GET' ? body : params,
-                        data: method !== 'GET' ? body : null,
-                        timeout: 10000,
-                        retry: 1
-                    });
-                    
-                    if (response.error) {
-                        throw new Error(response.message);
-                    }
-                    
-                    output = response;
-                } else {
-                    // Simular procesamiento para otros tipos de nodos
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                    
-                    // Simular salida según tipo de nodo
-                    switch (node.type) {
-                        case 'database':
-                            output = { rows: [{ id: 1, name: 'Test' }] };
-                            break;
-                        case 'email':
-                            output = { sent: true, recipient: 'test@example.com' };
-                            break;
-                        default:
-                            output = { success: true };
-                    }
-                }
-                
-                // Calcular duración
-                const duration = Date.now() - startTime;
-                
-                // Actualizar nodo con éxito
-                setExecutionData(prev => prev.map(n => 
-                    n.id === node.id ? { 
-                        ...n, 
-                        status: 'success',
-                        output,
-                        duration 
-                    } : n
-                ));
-                
-                success(`Nodo "${node.name}" ejecutado correctamente`);
-            } catch (err) {
-                const duration = Date.now() - startTime;
-                
-                // Actualizar nodo con error
-                setExecutionData(prev => prev.map(n => 
-                    n.id === node.id ? { 
-                        ...n, 
-                        status: 'error',
-                        error: err.message || 'Error en la ejecución',
-                        duration 
-                    } : n
-                ));
-                
-                error(`Error al ejecutar el nodo "${node.name}": ${err.message}`);
-                break; // Detener ejecución en caso de error
+
+        // Limpiar resultados anteriores
+        clearExecutionResults();
+
+        // Adaptar los nodos a la estructura esperada por WorkflowContext
+        const adaptedNodes = workflowNodes.map(node => ({
+            id: node.id,
+            type: node.service?.id,
+            data: {
+                label: node.name,
+                config: node.config || {}
             }
-        }
-    
-        setCurrentExecutingNode(null);
-        setWorkflowConfig(prev => ({ ...prev, status: 'ready' }));
-    
-        // Actualizar historial
-        const newExecution = {
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            status: executionData.every(node => node.status === 'success') ? 'success' : 'error',
-            duration: executionData.reduce((sum, node) => sum + (node.duration || 0), 0),
-            nodesExecuted: workflowNodes.length,
-            nodes: executionData.map(n => ({
-                id: n.id,
-                name: n.name,
-                status: n.status,
-                duration: n.duration
-            }))
-        };
-        
-        setExecutionHistory(prev => [newExecution, ...prev]);
-        
-        if (newExecution.status === 'success') {
-            success('Workflow ejecutado correctamente');
-        } else {
-            warning('Workflow finalizado con errores');
+        }));
+
+        console.log("Nodos adaptados:", adaptedNodes);
+
+        // Adaptar conexiones si es necesario
+        const adaptedConnections = workflowConnections;
+
+        // Iniciar tiempo para medición
+        const startTime = Date.now();
+
+        try {
+            // Ejecutar workflow usando el execution manager
+            const results = await executionManagerRef.current.executeWorkflow({
+                nodes: adaptedNodes,
+                edges: workflowConnections
+            }, { initialInputs: {} });
+
+            // Calcular duración total
+            const totalDuration = Date.now() - startTime;
+
+            // Actualizar historial
+            const newExecution = {
+                id: Date.now(),
+                timestamp: new Date().toISOString(),
+                status: results.success ? 'success' : 'error',
+                duration: totalDuration,
+                nodesExecuted: Object.keys(results.results || {}).length,
+                nodes: Object.entries(results.status || {}).map(([id, status]) => {
+                    const node = workflowNodes.find(n => n.id === id);
+                    return {
+                        id,
+                        name: node?.name || id,
+                        status: status === 'completed' ? 'success' : status,
+                        duration: results.nodeDurations?.[id] || 0
+                    };
+                })
+            };
+
+            setExecutionHistory(prev => [newExecution, ...prev]);
+
+            if (results.success) {
+                success('Workflow ejecutado correctamente');
+            } else {
+                warning('Workflow finalizado con errores');
+            }
+        } catch (err) {
+            error(`Error al ejecutar workflow: ${err.message}`);
+
+            // Actualizar historial con error
+            const newExecution = {
+                id: Date.now(),
+                timestamp: new Date().toISOString(),
+                status: 'error',
+                duration: Date.now() - startTime,
+                error: err.message,
+                nodesExecuted: 0,
+                nodes: []
+            };
+
+            setExecutionHistory(prev => [newExecution, ...prev]);
         }
     };
-
     const validateWorkflow = () => {
         const errors = [];
-
+        const warnings = [];
+    
         // Validar que haya nodos
         if (workflowNodes.length === 0) {
             errors.push('El workflow debe tener al menos un nodo');
+            return { valid: false, errors, warnings };
         }
-
+    
         // Validar conexiones
         if (workflowNodes.length > 1 && workflowConnections.length === 0) {
             errors.push('Los nodos deben estar conectados');
         }
-
-        // Validar configuración de nodos
+    
+        // Validar configuración de nodos - adaptado a tu estructura real
         workflowNodes.forEach(node => {
-            if (!node.config || Object.keys(node.config).length === 0) {
-                errors.push(`El nodo "${node.name}" no está configurado`);
+            if (!node.config || Object.keys(node.config || {}).length === 0) {
+                errors.push(`El nodo "${node.name || node.id}" no está configurado`);
             }
-            
+    
             // Validaciones específicas por tipo
-            if (node.type === 'api_rest' && !node.config?.url) {
-                errors.push(`El nodo "${node.name}" debe tener una URL configurada`);
+            const nodeType = node.service?.id;
+            if (nodeType === 'api_rest') {
+                if (!node.config?.url) {
+                    errors.push(`El nodo "${node.name || node.id}" debe tener una URL configurada`);
+                }
+    
+                // Validar método HTTP
+                if (!node.config?.method) {
+                    warnings.push(`El nodo "${node.name || node.id}" no tiene un método HTTP configurado, se usará GET por defecto`);
+                }
+            } else if (nodeType === 'database') {
+                if (!node.config?.query) {
+                    errors.push(`El nodo "${node.name || node.id}" debe tener una consulta configurada`);
+                }
+            } else if (nodeType === 'email') {
+                if (!node.config?.to) {
+                    errors.push(`El nodo "${node.name || node.id}" debe tener un destinatario configurado`);
+                }
+                if (!node.config?.subject) {
+                    warnings.push(`El nodo "${node.name || node.id}" no tiene asunto configurado`);
+                }
             }
         });
-
-        return errors;
-    };
     
+        // Usar también la validación del contexto
+        try {
+            // Adaptar los nodos para la validación del contexto
+            const adaptedNodesForValidation = workflowNodes.map(node => ({
+                id: node.id,
+                type: node.service?.id,
+                data: {
+                    label: node.name,
+                    config: node.config || {}
+                }
+            }));
+            
+            const contextValidation = validateWorkflowContext(adaptedNodesForValidation, workflowConnections);
+            if (!contextValidation.valid) {
+                contextValidation.issues.forEach(issue => {
+                    if (issue.type === 'error') {
+                        errors.push(issue.message);
+                    } else if (issue.type === 'warning') {
+                        warnings.push(issue.message);
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Error en validación avanzada:', e);
+        }
+    
+        return {
+            valid: errors.length === 0,
+            errors,
+            warnings
+        };
+    };
+
     const handleSave = () => {
         try {
             const workflow = {
@@ -850,21 +359,24 @@ function App() {
             error('Error al guardar el workflow');
         }
     };
-    
+
+    // Cancelar ejecución
+    const handleCancelExecution = () => {
+        cancelExecution();
+        warning('Ejecución del workflow cancelada');
+    };
+
     // Exportar como imagen
     const handleExportImage = () => {
-        if (!canvasRef.current) {
-            warning('No se pudo acceder al canvas');
-            return;
-        }
+        // La función exportAsImage recibe ahora los callbacks directamente
         exportAsImage(
-            canvasRef.current, 
+            null, // No necesitamos pasar el elemento DOM
             `${workflowConfig.name.replace(/\s+/g, '_')}.png`,
             (message) => success(message),
             (message) => error(message)
         );
     };
-    
+
     // Exportar como JSON
     const handleExportJson = () => {
         const workflowData = {
@@ -876,9 +388,9 @@ function App() {
                 lastSaved: new Date().toISOString()
             }
         };
-        
+
         exportAsJson(
-            workflowData, 
+            workflowData,
             `${workflowConfig.name.replace(/\s+/g, '_')}.json`,
             (message) => success(message),
             (message) => error(message)
@@ -925,6 +437,31 @@ function App() {
         setWorkflowConnections(connections);
     };
 
+    // Prueba de conexión a API para un nodo específico
+    const handleTestApiConnection = async (node) => {
+        if (!node || node.type !== 'api_rest' || !node.data?.config?.url) {
+            warning('No es posible probar este nodo. Asegúrate de que sea una API y tenga una URL configurada');
+            return;
+        }
+
+        info(`Probando conexión a ${node.data.config.url}...`);
+
+        try {
+            const result = await executionManagerRef.current.executeNode(node, {});
+
+            if (result.error) {
+                error(`Error al conectar con API: ${result.message || 'Error desconocido'}`);
+                return false;
+            }
+
+            success(`Conexión exitosa a ${node.data.config.url}`);
+            return true;
+        } catch (err) {
+            error(`Error al probar conexión: ${err.message}`);
+            return false;
+        }
+    };
+
     return (
         <div className="h-screen flex flex-col">
             <Toolbar
@@ -935,6 +472,9 @@ function App() {
                     setWorkflowConfig(prev => ({ ...prev, interval }))
                 }
                 onExecute={handleExecute}
+                onCancelExecution={handleCancelExecution}
+                isExecuting={isExecuting}
+                progress={progress}
                 onSave={handleSave}
                 onSettingsClick={() => setIsSettingsOpen(true)}
                 onHistoryClick={() => setIsHistoryOpen(true)}
@@ -942,22 +482,48 @@ function App() {
                 notificationBell={<NotificationBell />}
             />
             <div className="flex-1 flex overflow-hidden">
-                <ServicesSidebar />
+                <ServicesSidebar
+                    onTestApiConnection={handleTestApiConnection}
+                />
                 <div className="flex-1 flex">
-                    <Canvas
+                    {/* <Canvas
                         ref={canvasRef}
                         initialNodes={workflowNodes}
                         initialConnections={workflowConnections}
                         onSave={handleWorkflowUpdate}
                         onExportImage={handleExportImage}
                         onExportJson={handleExportJson}
+                        activeNodeId={activeNodeId}
+                        executionStatus={executionResults ?
+                            Object.entries(executionResults).reduce((acc, [id, result]) => {
+                                acc[id] = result?.error ? 'error' : 'success';
+                                return acc;
+                            }, {}) : {}
+                        }
+                    /> */}
+                    <Canvas
+                        initialNodes={workflowNodes}
+                        initialConnections={workflowConnections}
+                        onSave={handleWorkflowUpdate}
+                        onExportImage={handleExportImage}
+                        onExportJson={handleExportJson}
+                        activeNodeId={activeNodeId}
+                        executionStatus={executionResults ?
+                            Object.entries(executionResults).reduce((acc, [id, result]) => {
+                                acc[id] = result?.error ? 'error' : 'success';
+                                return acc;
+                            }, {}) : {}
+                        }
                     />
+                    {/* Reemplazamos el antiguo PreviewPanel con nuestro nuevo ExecutionController */}
                     {isPreviewOpen && (
-                        <PreviewPanel
+                        <ExecutionController
+                            workflowId={workflowId}
+                            executionManager={executionManagerRef.current}
                             isOpen={isPreviewOpen}
                             onClose={() => setIsPreviewOpen(false)}
-                            executionData={executionData}
-                            currentNode={currentExecutingNode}
+                            // Opcional: Para mantener compatibilidad con el código existente
+                            initialExecutionData={executionData}
                         />
                     )}
                 </div>
@@ -977,9 +543,10 @@ function App() {
                 isOpen={isHistoryOpen}
                 onClose={() => setIsHistoryOpen(false)}
                 history={executionHistory}
+                onRunAgain={handleExecute}
             />
         </div>
     );
 }
 
-export default App;
+export default WorkflowApp;

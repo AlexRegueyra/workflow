@@ -462,15 +462,34 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
         success('Etiqueta de conexión actualizada');
     };
 
+    // función de generación de URL compartible
     const handleShareUrl = () => {
-        const workflowData = { nodes, connections };
+        // Pasar el objeto de datos en lugar del elemento DOM
         generateShareableUrl(
-            workflowData,
+            getWorkflowData(),
             (message) => success(message),
             (message) => error(message)
         );
     };
 
+    // función de exportación a JSON o mantener la misma (si está usando la referencia al DOM)
+    const handleExportJson = () => {
+        // Pasar el objeto de datos en lugar del elemento DOM
+        exportAsJson(
+            getWorkflowData(),
+            'workflow.json',
+            (message) => success(message),
+            (message) => error(message)
+        );
+    };
+
+    // función para exportar el workflow como objeto de datos
+    const getWorkflowData = () => {
+        return {
+            nodes,
+            connections
+        };
+    };
 
     // Atajos de teclado
     useEffect(() => {
@@ -610,12 +629,7 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                     </button>
 
                     <button
-                        onClick={() => exportAsJson(
-                            containerRef.current,
-                            'workflow.json',
-                            (message) => success(message),
-                            (message) => error(message)
-                        )}
+                        onClick={handleExportJson}
                         className="p-2 rounded bg-white hover:bg-gray-100 shadow"
                         title="Exportar como JSON"
                     >
