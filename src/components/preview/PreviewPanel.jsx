@@ -1,24 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    X, 
-    PlayCircle, 
-    AlertCircle, 
-    CheckCircle, 
-    Loader, 
-    FileText, 
+import {
+    X,
+    PlayCircle,
+    AlertCircle,
+    CheckCircle,
+    Loader,
+    FileText,
     XCircle,
     Clock,
-    Info,
     ArrowRight,
-    CornerDownRight,
     List,
     Eye
 } from 'lucide-react';
+import { ResultViewer } from '../../utils/resultsBd';
 
-const PreviewPanel = ({ 
-    isOpen, 
-    onClose, 
-    executionData, 
+const PreviewPanel = ({
+    isOpen,
+    onClose,
+    executionData,
     currentNode,
     workflowExecutionLog,
     onCancelExecution,
@@ -60,17 +59,17 @@ const PreviewPanel = ({
 
     const renderStatusIcon = (status) => {
         switch (status) {
-            case 'pending': 
+            case 'pending':
                 return <PlayCircle className="w-5 h-5 text-gray-400" />;
-            case 'running': 
+            case 'running':
                 return <Loader className="w-5 h-5 text-blue-500 animate-spin" />;
-            case 'success': 
+            case 'success':
                 return <CheckCircle className="w-5 h-5 text-green-500" />;
-            case 'error': 
+            case 'error':
                 return <XCircle className="w-5 h-5 text-red-500" />;
             case 'cancelled':
                 return <AlertCircle className="w-5 h-5 text-yellow-500" />;
-            default: 
+            default:
                 return null;
         }
     };
@@ -102,14 +101,14 @@ const PreviewPanel = ({
                                 {capitalizeFirstLetter(node.status)}
                             </span>
                         </h2>
-                        <button 
+                        <button
                             onClick={() => setSelectedNodeLogs(null)}
                             className="text-gray-500 hover:text-gray-700"
                         >
                             <X className="w-6 h-6" />
                         </button>
                     </div>
-                    
+
                     {node.logs && node.logs.length > 0 ? (
                         <div className="bg-gray-100 p-4 rounded-md mb-4">
                             <h3 className="text-sm font-medium mb-2 flex items-center">
@@ -134,8 +133,8 @@ const PreviewPanel = ({
                                         )}
                                         {log.data && (
                                             <div className="mt-1 text-xs bg-gray-50 p-1 rounded font-mono overflow-x-auto">
-                                                {typeof log.data === 'object' 
-                                                    ? JSON.stringify(log.data, null, 2) 
+                                                {typeof log.data === 'object'
+                                                    ? JSON.stringify(log.data, null, 2)
                                                     : String(log.data)}
                                             </div>
                                         )}
@@ -148,18 +147,22 @@ const PreviewPanel = ({
                             No hay logs disponibles para este nodo
                         </div>
                     )}
-                    
+                
+
                     {node.output && (
                         <div className="mt-4">
                             <h3 className="text-sm font-medium mb-2 flex items-center">
                                 <ArrowRight className="w-4 h-4 mr-1" /> Salida del nodo
                             </h3>
-                            <pre className="text-sm bg-gray-100 p-3 rounded-md overflow-x-auto border">
-                                {JSON.stringify(node.output, null, 2)}
-                            </pre>
+                            {node.type === 'database' ? (
+                                <ResultViewer result={node.output} />
+                            ) : (
+                                <pre className="text-sm bg-gray-100 p-3 rounded-md overflow-x-auto border">
+                                    {JSON.stringify(node.output, null, 2)}
+                                </pre>
+                            )}
                         </div>
                     )}
-                    
                     {node.error && (
                         <div className="mt-4">
                             <h3 className="text-sm font-medium mb-2 flex items-center text-red-600">
@@ -170,7 +173,7 @@ const PreviewPanel = ({
                             </div>
                         </div>
                     )}
-                    
+
                     <div className="mt-4 flex justify-end">
                         <button
                             onClick={() => setSelectedNodeLogs(null)}
@@ -183,7 +186,7 @@ const PreviewPanel = ({
             </div>
         );
     };
-    
+
     // Componente para mostrar el log completo de ejecución del workflow
     const ExecutionLogModal = () => {
         if (!workflowExecutionLog || workflowExecutionLog.length === 0) {
@@ -192,7 +195,7 @@ const PreviewPanel = ({
                     <div className="bg-white rounded-lg w-3/4 max-h-[80vh] overflow-auto p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-semibold">Log de Ejecución del Workflow</h2>
-                            <button 
+                            <button
                                 onClick={() => setShowFullExecutionLog(false)}
                                 className="text-gray-500 hover:text-gray-700"
                             >
@@ -212,23 +215,22 @@ const PreviewPanel = ({
                 <div className="bg-white rounded-lg w-3/4 max-h-[80vh] overflow-auto p-6">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold">Log de Ejecución del Workflow</h2>
-                        <button 
+                        <button
                             onClick={() => setShowFullExecutionLog(false)}
                             className="text-gray-500 hover:text-gray-700"
                         >
                             <X className="w-6 h-6" />
                         </button>
                     </div>
-                    
+
                     <div className="bg-gray-100 p-4 rounded-md">
                         <div className="space-y-1">
                             {workflowExecutionLog.map((log, index) => (
-                                <div 
-                                    key={index} 
-                                    className={`p-2 border-b border-gray-200 bg-white rounded-md ${
-                                        log.error ? 'bg-red-50' : 
+                                <div
+                                    key={index}
+                                    className={`p-2 border-b border-gray-200 bg-white rounded-md ${log.error ? 'bg-red-50' :
                                         log.nodeType === 'warning' ? 'bg-yellow-50' : 'bg-white'
-                                    }`}
+                                        }`}
                                 >
                                     <div className="flex items-start gap-2">
                                         <span className="text-gray-500 text-xs whitespace-nowrap font-mono">
@@ -261,145 +263,164 @@ const PreviewPanel = ({
         );
     };
 
-  // Reemplaza la función de filtrado actual con esta
-  const filteredExecutionData = executionData.filter(node => 
-    node.status === 'success' || node.status === 'error' || node.status === 'running'
-);
-  return (
-    <div className="w-80 bg-white border-l flex flex-col h-full">
-        {/* Header */}
-        <div className="px-4 py-3 border-b flex items-center justify-between">
-            <h3 className="font-medium">Vista Previa de Ejecución</h3>
-            <div className="flex items-center gap-2">
-                {showLogButton && (
-                    <button 
-                        onClick={() => setShowFullExecutionLog(true)}
+    // Reemplaza la función de filtrado actual con esta
+    const filteredExecutionData = executionData.filter(node =>
+        node.status === 'success' || node.status === 'error' || node.status === 'running'
+    );
+    return (
+        <div className="w-80 bg-white border-l flex flex-col h-full">
+            {/* Header */}
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+                <h3 className="font-medium">Vista Previa de Ejecución</h3>
+                <div className="flex items-center gap-2">
+                    {showLogButton && (
+                        <button
+                            onClick={() => setShowFullExecutionLog(true)}
+                            className="p-1 hover:bg-gray-100 rounded-full"
+                            title="Ver log completo de ejecución"
+                        >
+                            <List className="w-5 h-5 text-gray-500" />
+                        </button>
+                    )}
+                    <button
+                        onClick={onClose}
                         className="p-1 hover:bg-gray-100 rounded-full"
-                        title="Ver log completo de ejecución"
                     >
-                        <List className="w-5 h-5 text-gray-500" />
+                        <X className="w-5 h-5 text-gray-500" />
                     </button>
-                )}
-                <button 
-                    onClick={onClose}
-                    className="p-1 hover:bg-gray-100 rounded-full"
-                >
-                    <X className="w-5 h-5 text-gray-500" />
-                </button>
+                </div>
             </div>
-        </div>
 
-        {/* Content - Área principal para nodos */}
-        <div className="flex-1 overflow-y-auto">
-            {filteredExecutionData.map((node) => (
-                <div
-                    key={node.id}
-                    className={`p-4 border-b ${getStatusColor(node.status)} ${currentNode?.id === node.id ? 'ring-2 ring-purple-500' : ''}`}
-                >
-                    <div className="flex items-center gap-3 mb-2">
-                        {renderStatusIcon(node.status)}
-                        <div className="flex-1">
-                            <span className="font-medium">{node.name}</span>
-                            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${getStatusTextColor(node.status)} bg-opacity-20 ${getStatusColor(node.status)}`}>
-                                {capitalizeFirstLetter(node.status)}
-                            </span>
-                        </div>
-                        
-                        {(node.logs?.length > 0 || node.output || node.error) && (
-                            <button 
-                                onClick={() => setSelectedNodeLogs(node)}
-                                className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-100 rounded"
-                                title="Ver logs del nodo"
-                            >
-                                <FileText className="w-5 h-5" />
-                            </button>
-                        )}
-                    </div>
-
-                    {node.status === 'success' && node.output && (
-                        <div className="mt-2">
-                            <div className="text-xs text-gray-500 mb-1 flex items-center">
-                                <ArrowRight className="w-4 h-4 mr-1" /> Salida:
+            {/* Content - Área principal para nodos */}
+            <div className="flex-1 overflow-y-auto">
+                {filteredExecutionData.map((node) => (
+                    <div
+                        key={node.id}
+                        className={`p-4 border-b ${getStatusColor(node.status)} ${currentNode?.id === node.id ? 'ring-2 ring-purple-500' : ''}`}
+                    >
+                        <div className="flex items-center gap-3 mb-2">
+                            {renderStatusIcon(node.status)}
+                            <div className="flex-1">
+                                <span className="font-medium">{node.name}</span>
+                                <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${getStatusTextColor(node.status)} bg-opacity-20 ${getStatusColor(node.status)}`}>
+                                    {capitalizeFirstLetter(node.status)}
+                                </span>
                             </div>
-                            <div className="bg-white p-2 rounded-md overflow-hidden border">
-                                <div className="text-xs text-gray-700 truncate">
-                                    {typeof node.output === 'object' 
-                                        ? JSON.stringify(node.output).substring(0, 120) + '...'
-                                        : String(node.output).substring(0, 120) + '...'}
-                                </div>
+
+                            {(node.logs?.length > 0 || node.output || node.error) && (
                                 <button
                                     onClick={() => setSelectedNodeLogs(node)}
-                                    className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                    className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-100 rounded"
+                                    title="Ver logs del nodo"
                                 >
-                                    Ver detalle completo
+                                    <FileText className="w-5 h-5" />
                                 </button>
-                            </div>
+                            )}
                         </div>
-                    )}
 
-                    {node.status === 'error' && node.error && (
-                        <div className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200 flex items-start">
-                            <AlertCircle className="w-4 h-4 mr-1 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <div className="font-medium text-xs">Error:</div>
-                                <div className="text-xs">{node.error}</div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="mt-2 flex gap-2 text-xs">
-                        {node.duration !== undefined && (
-                            <div className="text-gray-500 flex items-center">
-                                <Clock className="w-3 h-3 mr-1" /> {node.duration}ms
+                        {node.status === 'success' && node.output && (
+                            <div className="mt-2">
+                                <div className="text-xs text-gray-500 mb-1 flex items-center">
+                                    <ArrowRight className="w-4 h-4 mr-1" /> Salida:
+                                </div>
+                                <div className="bg-white p-2 rounded-md overflow-hidden border">
+                                    {node.type === 'database' ? (
+                                        <>
+                                            <div className="text-xs flex items-center gap-1 mb-1">
+                                                <span className="font-medium">Resultado de consulta</span>
+                                                {node.output.data?.rowsAffected && (
+                                                    <span className="text-gray-500">{node.output.data.rowsAffected} filas</span>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => setSelectedNodeLogs(node)}
+                                                className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                            >
+                                                Ver resultados completos
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="text-xs text-gray-700 truncate">
+                                                {typeof node.output === 'object'
+                                                    ? JSON.stringify(node.output).substring(0, 120) + '...'
+                                                    : String(node.output).substring(0, 120) + '...'}
+                                            </div>
+                                            <button
+                                                onClick={() => setSelectedNodeLogs(node)}
+                                                className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                            >
+                                                Ver detalle completo
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         )}
-                        
-                        {node.logs && node.logs.length > 0 && (
-                            <div className="text-gray-500">
-                                {node.logs.length} eventos
+
+                        {node.status === 'error' && node.error && (
+                            <div className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200 flex items-start">
+                                <AlertCircle className="w-4 h-4 mr-1 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <div className="font-medium text-xs">Error:</div>
+                                    <div className="text-xs">{node.error}</div>
+                                </div>
                             </div>
                         )}
+
+                        <div className="mt-2 flex gap-2 text-xs">
+                            {node.duration !== undefined && (
+                                <div className="text-gray-500 flex items-center">
+                                    <Clock className="w-3 h-3 mr-1" /> {node.duration}ms
+                                </div>
+                            )}
+
+                            {node.logs && node.logs.length > 0 && (
+                                <div className="text-gray-500">
+                                    {node.logs.length} eventos
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            ))}
-            
-            {executionData.length === 0 && (
-                <div className="p-8 text-center text-gray-500">
-                    No hay datos de ejecución disponibles
-                </div>
-            )}
-            
-            {/* Botón para ver logs completos del workflow - MOVIDO AQUÍ */}
-            {showLogButton && (
-                <div className="px-4 py-3 border-t">
-                    <button
-                        onClick={() => setShowFullExecutionLog(true)}
-                        className="w-full py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md text-sm font-medium flex items-center justify-center"
-                    >
-                        <List className="w-4 h-4 mr-2" />
-                        Ver logs de ejecución completos
-                    </button>
-                </div>
-            )}
-            
-            {/* Botón para debugging - MOVIDO AQUÍ */}
-            {(!showLogButton && (isExecuting || executionData.length > 0)) && (
-                <div className="px-4 py-3 border-t">
-                    <button
-                        onClick={() => setShowFullExecutionLog(true)}
-                        className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium flex items-center justify-center"
-                    >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Verificar disponibilidad de logs
-                    </button>
-                </div>
-            )}
-        </div>
+                ))}
 
-        {selectedNodeLogs && <NodeLogModal node={selectedNodeLogs} />}
-        {showFullExecutionLog && <ExecutionLogModal />}
-    </div>
-);
+                {executionData.length === 0 && (
+                    <div className="p-8 text-center text-gray-500">
+                        No hay datos de ejecución disponibles
+                    </div>
+                )}
+
+                {/* Botón para ver logs completos del workflow - MOVIDO AQUÍ */}
+                {showLogButton && (
+                    <div className="px-4 py-3 border-t">
+                        <button
+                            onClick={() => setShowFullExecutionLog(true)}
+                            className="w-full py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md text-sm font-medium flex items-center justify-center"
+                        >
+                            <List className="w-4 h-4 mr-2" />
+                            Ver logs de ejecución completos
+                        </button>
+                    </div>
+                )}
+
+                {/* Botón para debugging - MOVIDO AQUÍ */}
+                {(!showLogButton && (isExecuting || executionData.length > 0)) && (
+                    <div className="px-4 py-3 border-t">
+                        <button
+                            onClick={() => setShowFullExecutionLog(true)}
+                            className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium flex items-center justify-center"
+                        >
+                            <Eye className="w-4 h-4 mr-2" />
+                            Verificar disponibilidad de logs
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {selectedNodeLogs && <NodeLogModal node={selectedNodeLogs} />}
+            {showFullExecutionLog && <ExecutionLogModal />}
+        </div>
+    );
 };
 
 export default PreviewPanel;
