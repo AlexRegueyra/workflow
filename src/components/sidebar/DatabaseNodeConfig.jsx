@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 
 const DatabaseNodeConfig = ({ node, onChange }) => {
     const config = node.config || {};
-
+    const [testingConnection, setTestingConnection] = useState(false);
+    const [testResult, setTestResult] = useState(null);
     const handleChange = (field, value) => {
         const updatedNode = {
             ...node,
@@ -12,6 +13,39 @@ const DatabaseNodeConfig = ({ node, onChange }) => {
             }
         };
         onChange(updatedNode);
+    };
+    const handleTestConnection = async () => {
+        setTestingConnection(true);
+        setTestResult(null);
+
+        try {
+            // Validar datos mínimos
+            if (!config.type || !config.host || !config.port || !config.database) {
+                throw new Error('Por favor completa los datos de conexión básicos');
+            }
+
+            // Simular la conexión (en un entorno real, esto sería una llamada API)
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Simular éxito o error aleatorio para demostración
+            const success = Math.random() > 0.3; // 70% de probabilidad de éxito
+
+            if (success) {
+                setTestResult({
+                    success: true,
+                    message: `Conexión exitosa a ${config.type} en ${config.host}:${config.port}/${config.database}`
+                });
+            } else {
+                throw new Error(`No se pudo conectar a la base de datos: error de autenticación`);
+            }
+        } catch (error) {
+            setTestResult({
+                success: false,
+                message: error.message
+            });
+        } finally {
+            setTestingConnection(false);
+        }
     };
 
     return (
@@ -115,13 +149,18 @@ const DatabaseNodeConfig = ({ node, onChange }) => {
 
             <button
                 className="w-full mt-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
-                onClick={() => {
-                    // Simulación de prueba de conexión
-                    alert(`Probando conexión a ${config.type} en ${config.host}:${config.port}`);
-                }}
+                onClick={handleTestConnection}
+                disabled={testingConnection}
             >
-                Probar Conexión
+                {testingConnection ? 'Probando...' : 'Probar Conexión'}
             </button>
+
+            {/* Mostrar resultado de la prueba */}
+            {testResult && (
+                <div className={`mt-2 p-2 rounded-md ${testResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <p className="text-sm">{testResult.message}</p>
+                </div>
+            )}
         </div>
     );
 };
