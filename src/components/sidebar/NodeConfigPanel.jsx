@@ -62,14 +62,14 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
 
     // Formatear headers y body como strings para la edición
     const [headersText, setHeadersText] = useState(
-        typeof config.headers === 'object' 
-            ? JSON.stringify(config.headers, null, 2) 
+        typeof config.headers === 'object'
+            ? JSON.stringify(config.headers, null, 2)
             : config.headers || '{}'
     );
-    
+
     const [bodyText, setBodyText] = useState(
-        typeof config.body === 'object' 
-            ? JSON.stringify(config.body, null, 2) 
+        typeof config.body === 'object'
+            ? JSON.stringify(config.body, null, 2)
             : config.body || '{}'
     );
 
@@ -77,7 +77,7 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
     const handleConfigChange = (field, value) => {
         const updatedConfig = { ...config, [field]: value };
         setConfig(updatedConfig);
-        
+
         // Actualizar el nodo
         onUpdate({
             ...node,
@@ -91,7 +91,7 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
     // Manejar cambio en los campos de texto JSON
     const handleJsonChange = (field, text, setter) => {
         setter(text);
-        
+
         try {
             // Intentar parsear como JSON
             const jsonValue = JSON.parse(text);
@@ -107,7 +107,7 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
         setIsLoading(true);
         setApiResponse(null);
         setApiError(null);
-        
+
         try {
             // Crear un objeto con la configuración para la prueba
             const testConfig = {
@@ -118,7 +118,7 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
                 authentication: config.authentication,
                 authConfig: config.authConfig
             };
-            
+
             // Llamar a la función de prueba de conexión
             const result = await onTestConnection(testConfig);
             setApiResponse(result);
@@ -133,8 +133,8 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
         <div className="space-y-4">
             <div className="form-group">
                 <label className="block text-sm font-medium text-gray-700 mb-1">URL del endpoint</label>
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     value={config.url}
                     onChange={(e) => handleConfigChange('url', e.target.value)}
                     placeholder="https://api.ejemplo.com/endpoint"
@@ -145,7 +145,7 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
             <div className="form-group">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Método HTTP</label>
                 <div className="relative">
-                    <select 
+                    <select
                         value={config.method}
                         onChange={(e) => handleConfigChange('method', e.target.value)}
                         className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none"
@@ -159,16 +159,8 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
             </div>
 
             <div className="form-group">
-                {/* <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Headers (JSON)
-                </label>
-                <textarea 
-                    value={headersText}
-                    onChange={(e) => handleJsonChange('headers', e.target.value, setHeadersText)}
-                    placeholder='{"Content-Type": "application/json"}'
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[80px] font-mono text-sm"
-                /> */}
-                   <JSONEditor
+
+                <JSONEditor
                     label="Headers (JSON)"
                     value={config.headers}
                     onChange={(jsonValue) => handleConfigChange('headers', jsonValue)}
@@ -179,29 +171,20 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
 
             {['POST', 'PUT', 'PATCH'].includes(config.method) && (
                 <div className="form-group">
-                     <JSONEditor
+                    <JSONEditor
                         label="Body (JSON)"
                         value={config.body}
                         onChange={(jsonValue) => handleConfigChange('body', jsonValue)}
                         placeholder='{"key": "value"}'
                         height="min-h-[100px]"
                     />
-                    {/* <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Body (JSON)
-                    </label>
-                    <textarea 
-                        value={bodyText}
-                        onChange={(e) => handleJsonChange('body', e.target.value, setBodyText)}
-                        placeholder='{"key": "value"}'
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[100px] font-mono text-sm"
-                    /> */}
                 </div>
             )}
 
             <div className="form-group">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Autenticación</label>
                 <div className="relative">
-                    <select 
+                    <select
                         value={config.authentication}
                         onChange={(e) => handleConfigChange('authentication', e.target.value)}
                         className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none"
@@ -219,8 +202,8 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
                 <div className="space-y-4 mt-2 p-3 bg-gray-50 rounded-md">
                     <div className="form-group">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={config.authConfig?.username || ''}
                             onChange={(e) => handleConfigChange('authConfig', {
                                 ...config.authConfig,
@@ -231,8 +214,8 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
                     </div>
                     <div className="form-group">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                        <input 
-                            type="password" 
+                        <input
+                            type="password"
                             value={config.authConfig?.password || ''}
                             onChange={(e) => handleConfigChange('authConfig', {
                                 ...config.authConfig,
@@ -248,8 +231,8 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
                 <div className="space-y-4 mt-2 p-3 bg-gray-50 rounded-md">
                     <div className="form-group">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Token</label>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={config.authConfig?.token || ''}
                             onChange={(e) => handleConfigChange('authConfig', {
                                 ...config.authConfig,
@@ -265,8 +248,8 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
                 <div className="space-y-4 mt-2 p-3 bg-gray-50 rounded-md">
                     <div className="form-group">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la clave</label>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={config.authConfig?.keyName || ''}
                             onChange={(e) => handleConfigChange('authConfig', {
                                 ...config.authConfig,
@@ -278,8 +261,8 @@ const NodeConfigPanel = ({ node, onUpdate, onTestConnection }) => {
                     </div>
                     <div className="form-group">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={config.authConfig?.keyValue || ''}
                             onChange={(e) => handleConfigChange('authConfig', {
                                 ...config.authConfig,

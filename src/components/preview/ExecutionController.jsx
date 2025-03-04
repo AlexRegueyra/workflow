@@ -2,10 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import PreviewPanel from './PreviewPanel';
 
 // Componente controlador que conecta el servicio de ejecución con el panel de visualización
-const ExecutionController = ({ 
-    workflowId, 
+const ExecutionController = ({
     executionManager, // Cambiado a executionManager para coincidir con tu implementación
-    isOpen, 
+    isOpen,
     onClose,
     initialExecutionData = [] // Opcional: datos iniciales si están disponibles
 }) => {
@@ -21,7 +20,7 @@ const ExecutionController = ({
     const addWorkflowLog = useCallback((logEntry) => {
         setWorkflowExecutionLog(prev => [...prev, logEntry]);
     }, []);
-    
+
     // Crear una función para capturar los logs de la consola
     const setupConsoleCapture = useCallback(() => {
         // Guardar las referencias originales de console.log y console.error
@@ -30,14 +29,14 @@ const ExecutionController = ({
         const originalWarn = console.warn;
 
         // Sobrescribir console.log para capturar
-        console.log = function(...args) {
+        console.log = function (...args) {
             // Llamar a la función original primero
             originalLog.apply(console, args);
-            
+
             // Procesar solo si está relacionado con la ejecución
             if (typeof args[0] === 'string') {
                 const message = args[0];
-                
+
                 // Capturar resultados de nodos
                 if (message.includes('Resultado de nodo')) {
                     try {
@@ -46,15 +45,15 @@ const ExecutionController = ({
                         if (match) {
                             const nodeId = match[1];
                             const nodeType = match[2];
-                            
+
                             // Obtener el resultado (segundo argumento)
                             const result = args[1];
-                            
+
                             // Actualizar executionData con este resultado
                             setExecutionData(prev => {
                                 // Verificar si el nodo ya existe en los datos
                                 const existingNodeIndex = prev.findIndex(node => node.id === nodeId);
-                                
+
                                 if (existingNodeIndex >= 0) {
                                     // Actualizar nodo existente
                                     const newData = [...prev];
@@ -79,7 +78,7 @@ const ExecutionController = ({
                                     }];
                                 }
                             });
-                            
+
                             // Agregar log
                             addWorkflowLog({
                                 nodeId,
@@ -93,18 +92,18 @@ const ExecutionController = ({
                         console.error('Error procesando log de resultado', error);
                     }
                 }
-                
+
                 // Capturar inputs para nodos
                 else if (message.includes('Inputs finales para nodo')) {
                     try {
                         const match = message.match(/Inputs finales para nodo ([^:]+):/);
                         if (match) {
                             const nodeId = match[1];
-                            
+
                             // Actualizar nodo como "running"
                             setExecutionData(prev => {
                                 const existingNodeIndex = prev.findIndex(node => node.id === nodeId);
-                                
+
                                 if (existingNodeIndex >= 0) {
                                     // Nodo ya existe, actualizar estado
                                     const newData = [...prev];
@@ -119,7 +118,7 @@ const ExecutionController = ({
                                     let nodeType = 'node';
                                     if (nodeId.includes('api_rest')) nodeType = 'API REST';
                                     if (nodeId.includes('conditional')) nodeType = 'Condicional';
-                                    
+
                                     // Agregar nuevo nodo
                                     return [...prev, {
                                         id: nodeId,
@@ -131,10 +130,10 @@ const ExecutionController = ({
                                     }];
                                 }
                             });
-                            
+
                             // Establecer como nodo actual
                             setCurrentNodeId(nodeId);
-                            
+
                             // Agregar log
                             addWorkflowLog({
                                 nodeId,
@@ -147,16 +146,16 @@ const ExecutionController = ({
                         console.error('Error procesando log de inputs', error);
                     }
                 }
-                
+
                 // Capturar logs del nodo condicional
-                else if (message.includes('🔍 Inputs COMPLETOS al nodo condicional') || 
-                         message.includes('🧐 Detalles de evaluación')) {
+                else if (message.includes('🔍 Inputs COMPLETOS al nodo condicional') ||
+                    message.includes('🧐 Detalles de evaluación')) {
                     try {
                         // Buscar el nodo condicional actualmente en ejecución
                         const conditionalNode = executionData.find(
                             node => node.type === 'Condicional' && node.status === 'running'
                         );
-                        
+
                         if (conditionalNode) {
                             // Agregar al log del nodo
                             setExecutionData(prev => {
@@ -170,7 +169,7 @@ const ExecutionController = ({
                                         data: args[1] || null,
                                         timestamp: new Date().toISOString()
                                     });
-                                    
+
                                     newData[nodeIndex] = {
                                         ...newData[nodeIndex],
                                         logs
@@ -179,7 +178,7 @@ const ExecutionController = ({
                                 }
                                 return prev;
                             });
-                            
+
                             // Si contiene detalles de evaluación, extraer información
                             if (message.includes('Detalles de evaluación')) {
                                 const conditionalDetails = args[1];
@@ -200,18 +199,18 @@ const ExecutionController = ({
                 }
             }
         };
-        
+
         // Sobrescribir console.error para capturar errores
-        console.error = function(...args) {
+        console.error = function (...args) {
             // Llamar a la función original primero
             originalError.apply(console, args);
-            
+
             // Capturar errores relacionados con la ejecución
             if (typeof args[0] === 'string' && args[0].includes('Error en')) {
                 try {
                     const errorMessage = args[0];
                     const errorDetail = args[1] || 'Error desconocido';
-                    
+
                     // Buscar un nodo en estado running para marcar como fallido
                     setExecutionData(prev => {
                         const runningNodeIndex = prev.findIndex(node => node.status === 'running');
@@ -227,7 +226,7 @@ const ExecutionController = ({
                         }
                         return prev;
                     });
-                    
+
                     // Agregar al log general
                     addWorkflowLog({
                         nodeId: currentNodeId || 'unknown',
@@ -241,16 +240,16 @@ const ExecutionController = ({
                 }
             }
         };
-        
+
         // Sobrescribir console.warn para capturar advertencias
-        console.warn = function(...args) {
+        console.warn = function (...args) {
             // Llamar a la función original primero
             originalWarn.apply(console, args);
-            
+
             // Capturar advertencias relacionadas con la ejecución
             if (typeof args[0] === 'string' && (
-                args[0].includes('workflow') || 
-                args[0].includes('nodo') || 
+                args[0].includes('workflow') ||
+                args[0].includes('nodo') ||
                 args[0].includes('ejecución'))) {
                 try {
                     addWorkflowLog({
@@ -264,7 +263,7 @@ const ExecutionController = ({
                 }
             }
         };
-        
+
         // Devolver función para restaurar los console originales
         return () => {
             console.log = originalLog;
@@ -272,24 +271,24 @@ const ExecutionController = ({
             console.warn = originalWarn;
         };
     }, [currentNodeId, executionData, addWorkflowLog]);
-    
+
     // Iniciar captura de consola al montar el componente
     useEffect(() => {
         const restoreConsole = setupConsoleCapture();
-        
+
         // Escuchar eventos de workflowManager si está disponible
         if (executionManager && executionManager.addEventListener) {
             // Escuchar eventos como workflow-started, node-completed, etc.
             // ...código para escuchar eventos...
         }
-        
+
         // Limpiar al desmontar
         return () => {
             restoreConsole();
             // Limpiar event listeners de executionManager si existen
         };
     }, [setupConsoleCapture, executionManager]);
-    
+
     // Efecto para limpiar datos cuando se cierra el panel
     useEffect(() => {
         if (!isOpen) {
@@ -302,16 +301,16 @@ const ExecutionController = ({
                     setCurrentNodeId(null);
                 }
             }, 300);
-            
+
             return () => clearTimeout(timer);
         }
     }, [isOpen]);
-    
+
     // Función para cancelar ejecución
     const handleCancelExecution = useCallback(() => {
         if (executionManager && executionManager.cancelExecution && executionId) {
             executionManager.cancelExecution(executionId);
-            
+
             // Marcar todos los nodos running como cancelled
             setExecutionData(prev => prev.map(node => {
                 if (node.status === 'running') {
@@ -319,7 +318,7 @@ const ExecutionController = ({
                 }
                 return node;
             }));
-            
+
             // Agregar log
             addWorkflowLog({
                 nodeId: 'system',
@@ -327,14 +326,14 @@ const ExecutionController = ({
                 message: 'Ejecución cancelada por el usuario',
                 timestamp: new Date().toISOString()
             });
-            
+
             return true;
         }
         return false;
     }, [executionManager, executionId, addWorkflowLog]);
 
     return (
-        <PreviewPanel 
+        <PreviewPanel
             isOpen={isOpen}
             onClose={onClose}
             executionData={executionData}

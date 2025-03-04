@@ -1,199 +1,197 @@
-import React, { useState } from 'react';
+import { google } from 'googleapis';
+import axios from 'axios';
+import XLSX from 'xlsx';
+import Papa from 'papaparse';
+import fs from 'fs/promises';
 
-const SpreadsheetNodeConfig = ({ node, onChange }) => {
-    const config = node.config || {};
-
-    const handleChange = (field, value) => {
-        const updatedNode = {
-            ...node,
-            config: {
-                ...node.config,
-                [field]: value
-            }
+async function executeSpreadsheetNode(node, inputs, options = {}) {
+    const config = node.data?.config || {};
+    
+    try {
+        switch (config.serviceType) {
+            case 'google':
+                return await executeGoogleSheetsOperation(config);
+            
+            case 'excel_online':
+                return await executeExcelOnlineOperation(config);
+            
+            case 'excel_file':
+                return await executeExcelFileOperation(config);
+            
+            case 'csv':
+                return await executeCSVOperation(config);
+            
+            default:
+                throw new Error('Tipo de servicio no soportado');
+        }
+    } catch (error) {
+        console.error('Error executing spreadsheet operation:', error);
+        return {
+            success: false,
+            message: `Error: ${error.message}`,
+            error: error
         };
-        onChange(updatedNode);
+    }
+}
+
+async function executeGoogleSheetsOperation(config) {
+    // Validate required configuration
+    if (!config.spreadsheetId || !config.credentials) {
+        throw new Error('Faltan credenciales o ID de hoja de cálculo');
+    }
+
+    // Parse credentials
+    const credentials = typeof config.credentials === 'string' 
+        ? JSON.parse(config.credentials) 
+        : config.credentials;
+
+    // Authenticate with Google Sheets API
+    const client = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    const googleSheets = google.sheets({ version: 'v4', auth: client });
+
+    // Perform operation based on config
+    switch (config.operation) {
+        case 'read':
+            const response = await googleSheets.spreadsheets.values.get({
+                spreadsheetId: config.spreadsheetId,
+                range: config.range || config.sheetName,
+            });
+            return {
+                success: true,
+                data: response.data.values,
+                rowCount: response.data.values?.length || 0,
+                message: 'Datos leídos exitosamente'
+            };
+        
+        case 'append':
+            const appendResponse = await googleSheets.spreadsheets.values.append({
+                spreadsheetId: config.spreadsheetId,
+                range: config.range || config.sheetName,
+                valueInputOption: 'RAW',
+                insertDataOption: 'INSERT_ROWS',
+                resource: {
+                    values: config.appendData
+                }
+            });
+            return {
+                success: true,
+                rowCount: appendResponse.data.updates.updatedRows,
+                message: 'Filas añadidas exitosamente'
+            };
+        
+        case 'update':
+            const updateResponse = await googleSheets.spreadsheets.values.update({
+                spreadsheetId: config.spreadsheetId,
+                range: config.range || config.sheetName,
+                valueInputOption: 'RAW',
+                resource: {
+                    values: Object.entries(config.updateValues).map(([, value]) => [value])
+                }
+            });
+            return {
+                success: true,
+                rowCount: updateResponse.data.updatedCells,
+                message: 'Celdas actualizadas exitosamente'
+            };
+        
+        case 'clear':
+            const clearResponse = await googleSheets.spreadsheets.values.clear({
+                spreadsheetId: config.spreadsheetId,
+                range: config.range || config.sheetName,
+            });
+            return {
+                success: true,
+                message: 'Rango borrado exitosamente'
+            };
+        
+        default:
+            throw new Error('Operación no soportada para Google Sheets');
+    }
+}
+
+async function executeExcelOnlineOperation(config) {
+    // Validate required configuration
+    if (!config.fileUrl || !config.accessToken) {
+        throw new Error('Faltan URL o token de acceso');
+    }
+
+    // Fetch Excel file from online source
+    const response = await axios.get(config.fileUrl, {
+        headers: { 'Authorization': `Bearer ${config.accessToken}` },
+        responseType: 'arraybuffer'
+    });
+
+    // Parse Excel file
+    const workbook = XLSX.read(response.data, { type: 'buffer' });
+    const worksheet = workbook.Sheets[config.sheetName || workbook.SheetNames[0]];
+    
+    // Convert to array of arrays
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    return {
+        success: true,
+        data,
+        rowCount: data.length,
+        message: 'Datos leídos exitosamente'
     };
+}
 
-    return (
-        <div className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo de Servicio
-                </label>
-                <select
-                    value={config.serviceType || ''}
-                    onChange={(e) => handleChange('serviceType', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                    <option value="">Seleccionar servicio...</option>
-                    <option value="google">Google Sheets</option>
-                    <option value="excel_online">Excel Online</option>
-                    <option value="excel_file">Archivo Excel</option>
-                    <option value="csv">CSV</option>
-                </select>
-            </div>
+async function executeExcelFileOperation(config) {
+    // For local Excel file operations
+    if (!config.filePath) {
+        throw new Error('Ruta de archivo no especificada');
+    }
 
-            {config.serviceType === 'google' && (
-                <>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            ID de Hoja de Cálculo
-                        </label>
-                        <input
-                            type="text"
-                            value={config.spreadsheetId || ''}
-                            onChange={(e) => handleChange('spreadsheetId', e.target.value)}
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Credenciales (JSON)
-                        </label>
-                        <textarea
-                            value={typeof config.credentials === 'object' 
-                                ? JSON.stringify(config.credentials, null, 2) 
-                                : config.credentials || '{}'}
-                            onChange={(e) => {
-                                try {
-                                    const jsonValue = JSON.parse(e.target.value);
-                                    handleChange('credentials', jsonValue);
-                                } catch (error) {
-                                    handleChange('credentials', e.target.value);
-                                }
-                            }}
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[100px] font-mono text-sm"
-                            placeholder='{"client_email": "example@project.iam.gserviceaccount.com", ...}'
-                        />
-                    </div>
-                </>
-            )}
+    // Read file
+    const fileBuffer = await fs.readFile(config.filePath);
+    
+    // Parse Excel file
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const worksheet = workbook.Sheets[config.sheetName || workbook.SheetNames[0]];
+    
+    // Convert to array of arrays
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-            {config.serviceType === 'excel_online' && (
-                <>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            URL de la Hoja
-                        </label>
-                        <input
-                            type="text"
-                            value={config.fileUrl || ''}
-                            onChange={(e) => handleChange('fileUrl', e.target.value)}
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            placeholder="https://onedrive.live.com/edit.aspx?..."
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Token de Acceso
-                        </label>
-                        <input
-                            type="password"
-                            value={config.accessToken || ''}
-                            onChange={(e) => handleChange('accessToken', e.target.value)}
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                    </div>
-                </>
-            )}
+    return {
+        success: true,
+        data,
+        rowCount: data.length,
+        message: 'Datos leídos exitosamente'
+    };
+}
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre de la Hoja
-                </label>
-                <input
-                    type="text"
-                    value={config.sheetName || ''}
-                    onChange={(e) => handleChange('sheetName', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="Hoja1"
-                />
-            </div>
+async function executeCSVOperation(config) {
+    // For CSV file operations
+    if (!config.filePath) {
+        throw new Error('Ruta de archivo no especificada');
+    }
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Operación
-                </label>
-                <select
-                    value={config.operation || ''}
-                    onChange={(e) => handleChange('operation', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                    <option value="">Seleccionar operación...</option>
-                    <option value="read">Leer datos</option>
-                    <option value="append">Añadir filas</option>
-                    <option value="update">Actualizar celdas</option>
-                    <option value="clear">Borrar rango</option>
-                </select>
-            </div>
+    // Read file
+    const fileContent = await fs.readFile(config.filePath, 'utf8');
+    
+    // Parse CSV
+    return new Promise((resolve, reject) => {
+        Papa.parse(fileContent, {
+            complete: (results) => {
+                resolve({
+                    success: true,
+                    data: results.data,
+                    rowCount: results.data.length,
+                    message: 'Datos CSV leídos exitosamente'
+                });
+            },
+            error: (error) => {
+                reject({
+                    success: false,
+                    message: 'Error al parsear CSV',
+                    error
+                });
+            }
+        });
+    });
+}
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Rango
-                </label>
-                <input
-                    type="text"
-                    value={config.range || ''}
-                    onChange={(e) => handleChange('range', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="A1:D10"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                    Puedes usar variables: {"{{rango}}"}
-                </p>
-            </div>
-
-            {config.operation === 'append' && (
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Datos a añadir (JSON)
-                    </label>
-                    <textarea
-                        value={typeof config.appendData === 'object' 
-                            ? JSON.stringify(config.appendData, null, 2) 
-                            : config.appendData || '[]'}
-                        onChange={(e) => {
-                            try {
-                                const jsonValue = JSON.parse(e.target.value);
-                                handleChange('appendData', jsonValue);
-                            } catch (error) {
-                                handleChange('appendData', e.target.value);
-                            }
-                        }}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[100px] font-mono text-sm"
-                        placeholder='[["Valor 1", "Valor 2"], ["Valor 3", "Valor 4"]]'
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                        Puedes usar variables para construir los datos dinámicamente
-                    </p>
-                </div>
-            )}
-
-            {config.operation === 'update' && (
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Valores a actualizar (JSON)
-                    </label>
-                    <textarea
-                        value={typeof config.updateValues === 'object' 
-                            ? JSON.stringify(config.updateValues, null, 2) 
-                            : config.updateValues || '{}'}
-                        onChange={(e) => {
-                            try {
-                                const jsonValue = JSON.parse(e.target.value);
-                                handleChange('updateValues', jsonValue);
-                            } catch (error) {
-                                handleChange('updateValues', e.target.value);
-                            }
-                        }}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[100px] font-mono text-sm"
-                        placeholder='{"A1": "Nuevo valor", "B2": "Otro valor"}'
-                    />
-                </div>
-            )}
-        </div>
-    );
-};
-
-export default SpreadsheetNodeConfig;
+export { executeSpreadsheetNode };

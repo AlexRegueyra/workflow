@@ -209,9 +209,7 @@ export class ExecutionManager {
         }
     }
 
-    /**
-     * Ejecuta un nodo específico según su tipo
-     */
+
     /**
   * Ejecuta un nodo específico según su tipo
   */
@@ -244,7 +242,6 @@ export class ExecutionManager {
     /**
      * Ejecuta un nodo de tipo API REST usando ApiService
      */
-
     async executeApiRestNode(node, inputs = {}) {
         const config = node.data?.config || node.config || {};
 
