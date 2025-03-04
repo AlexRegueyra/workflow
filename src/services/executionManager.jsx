@@ -1,7 +1,5 @@
 // executionManager.js
 
-import { processTransformation } from "../components/sidebar/transformerProcessor";
-
 
 /**
  * Clase que maneja la ejecución de workflows y la integración con APIs reales
@@ -339,43 +337,103 @@ export class ExecutionManager {
         }
     }
     /**
-     * Ejecuta un nodo de base de datos (simulado)
+     * Ejecuta un nodo de base de datos
      */
     async executeDatabaseNode(node, inputs, options = {}) {
         const config = node.data?.config || {};
 
-        // Procesar la consulta SQL con los inputs
-        const query = this.processTemplate(config.query || '', inputs);
+        console.log(`[Database] Ejecutando operación en ${config.type || 'base de datos'}`);
+        console.log('[DEBUG] Configuración DB:', JSON.stringify(config, null, 2));
+        console.log('[DEBUG] Inputs recibidos:', JSON.stringify(inputs, null, 2).substring(0, 500) + '...');
 
-        // Simular consulta
-        console.log(`[DB Simulation] Executing query on ${config.type}:`, query);
+        try {
+            // Validar configuración mínima
+            if (!config.type || !config.host || !config.database) {
+                return {
+                    success: false,
+                    error: 'Configuración incompleta. Se requiere tipo, host y base de datos.',
+                    data: null
+                };
+            }
 
-        // Si es una consulta SELECT, simulamos datos de retorno
-        if (query.trim().toUpperCase().startsWith('SELECT')) {
-            // Simular resultado
+            // Procesar la consulta SQL para reemplazar variables
+            let processedQuery = config.query || '';
+
+            // Extraer variables de la consulta (formato {{variable}})
+            const variableMatches = processedQuery.match(/{{([^}]+)}}/g) || [];
+
+            // Reemplazar variables con valores de los inputs
+            for (const match of variableMatches) {
+                const variableName = match.replace(/{{|}}/g, '');
+                let variableValue = '';
+
+                const safeConfig = { ...config };
+                if (safeConfig.password) {
+                    safeConfig.password = '********';
+                }
+
+                // Navegar en la estructura de inputs para encontrar el valor
+                if (inputs && typeof inputs === 'object') {
+                    // Caso 1: input.default es un array
+                    if (inputs.default && Array.isArray(inputs.default)) {
+                        if (inputs.default.length > 0) {
+                            const firstItem = inputs.default[0];
+
+                            // Buscar en diferentes niveles: directo, .data, .default
+                            if (firstItem[variableName] !== undefined) {
+                                variableValue = firstItem[variableName];
+                            } else if (firstItem.data && firstItem.data[variableName] !== undefined) {
+                                variableValue = firstItem.data[variableName];
+                            } else if (firstItem.default && firstItem.default[variableName] !== undefined) {
+                                variableValue = firstItem.default[variableName];
+                            }
+                        }
+                    }
+                    // Caso 2: input.default es un objeto
+                    else if (inputs.default && typeof inputs.default === 'object') {
+                        if (inputs.default[variableName] !== undefined) {
+                            variableValue = inputs.default[variableName];
+                        } else if (inputs.default.data && inputs.default.data[variableName] !== undefined) {
+                            variableValue = inputs.default.data[variableName];
+                        }
+                    }
+                    // Caso 3: buscar en el input directo
+                    else if (inputs[variableName] !== undefined) {
+                        variableValue = inputs[variableName];
+                    }
+                }
+
+                // Reemplazar en la consulta (asegurar que sea string)
+                processedQuery = processedQuery.replace(match, String(variableValue));
+            }
+
+            console.log(`[Database] Consulta procesada: ${processedQuery}`);
+
+            // En un entorno real, aquí se realizaría la conexión y consulta a la base de datos
+            // Por ahora, simularemos los resultados
+
+            const resultado = await this.simulateDatabaseQuery(config, processedQuery, inputs);
+
             return {
                 success: true,
-                rows: [],
-                rowCount: 0,
+                data: resultado,
+                message: resultado.message || 'Operación completada',
                 metadata: {
-                    type: config.type,
-                    query,
-                    executionTime: Math.random() * 200
+                    dbType: config.type,
+                    operation: resultado.operation || 'query',
+                    rowsAffected: resultado.rowsAffected || resultado.data?.length || 0
                 }
             };
-        } else {
-            // Para otros tipos de consultas
+        } catch (error) {
+            console.error(`[Database] Error: ${error.message}`);
             return {
-                success: true,
-                affectedRows: Math.floor(Math.random() * 10),
-                metadata: {
-                    type: config.type,
-                    query,
-                    executionTime: Math.random() * 100
-                }
+                success: false,
+                error: error.message,
+                data: null
             };
         }
     }
+
 
     /**
      * Ejecuta un nodo de email (simulado)
@@ -492,9 +550,9 @@ export class ExecutionManager {
     async executeConditionalNode(node, inputs, options = {}) {
         const config = node.data?.config || {};
         const { field, operator, value } = config;
-        
+
         console.log("🔍 Inputs COMPLETOS al nodo condicional:", JSON.stringify(inputs, null, 2));
-        
+
         /**
          * Función mejorada para obtener valores anidados con manejo especial
          * para la estructura específica del workflow
@@ -503,38 +561,38 @@ export class ExecutionManager {
             // Caso especial: CustomResponse.campo cuando inputs.default es array
             if (path.startsWith("CustomResponse.") && obj.default && Array.isArray(obj.default)) {
                 const fieldName = path.replace("CustomResponse.", "");
-                
+
                 // Si hay elementos en el array default, buscar el valor en el primer elemento
                 if (obj.default.length > 0 && obj.default[0] && fieldName in obj.default[0]) {
                     return obj.default[0][fieldName];
                 }
             }
-            
+
             // Si el path está vacío, retornar el objeto completo
             if (!path || path === '') return obj;
-            
+
             // Normalizar la ruta (tratar CustomResponse y notación de arrays)
             const normalizedPath = path
                 .replace(/^CustomResponse\./, '')      // Eliminar prefijo CustomResponse
                 .replace(/\[(\w+)\]/g, '.$1');         // Convertir notación array[key] a array.key
-            
+
             // Separar por puntos para obtener un array de keys
             const keys = normalizedPath.split('.');
-            
+
             // Punto de entrada para búsqueda recursiva
             let value = obj;
-            
+
             // Si tenemos data.CustomResponse en el objeto, comenzar ahí para campos con prefijo CustomResponse
-            if (path.startsWith('CustomResponse.') && 
-                obj.data && 
+            if (path.startsWith('CustomResponse.') &&
+                obj.data &&
                 obj.data.CustomResponse) {
-                
+
                 // Si CustomResponse es un array, tomar el primer elemento
                 if (Array.isArray(obj.data.CustomResponse)) {
                     if (obj.data.CustomResponse.length > 0) {
                         const fieldWithoutPrefix = path.replace('CustomResponse.', '');
                         const firstItem = obj.data.CustomResponse[0];
-                        
+
                         if (firstItem && fieldWithoutPrefix in firstItem) {
                             return firstItem[fieldWithoutPrefix];
                         }
@@ -544,7 +602,7 @@ export class ExecutionManager {
                     value = obj.data.CustomResponse;
                 }
             }
-            
+
             // Manejar caso específico: si tenemos default como array y buscamos propiedades simples
             if (obj.default && Array.isArray(obj.default) && obj.default.length > 0) {
                 // Si el primer elemento tiene la propiedad que buscamos, usarlo
@@ -553,12 +611,12 @@ export class ExecutionManager {
                     value = firstItem;
                 }
             }
-            
+
             // Navegación a través de las claves
             for (const key of keys) {
                 // Si el valor es null o undefined, detener la navegación
                 if (value === null || value === undefined) return undefined;
-                
+
                 // Si el valor actual tiene un CustomResponse, intentar buscar ahí
                 if (value.CustomResponse) {
                     // Si CustomResponse es un array, buscar en el primer elemento
@@ -573,14 +631,14 @@ export class ExecutionManager {
                         continue;
                     }
                 }
-                
+
                 // Búsqueda normal en el objeto actual
                 value = value[key];
             }
-            
+
             return value;
         };
-        
+
         /**
          * Compara valores con manejo inteligente de tipos
          */
@@ -591,15 +649,15 @@ export class ExecutionManager {
                 if (op === 'notEquals') return expected !== null && expected !== undefined;
                 return false;
             }
-            
+
             // Convertir a string para operaciones de texto
             const actualStr = String(actual);
             const expectedStr = expected !== undefined ? String(expected) : '';
-            
+
             // Normalizar valores numéricos para comparaciones numéricas
             const actualNum = Number(actual);
             const expectedNum = Number(expected);
-            
+
             switch (op) {
                 case 'equals':
                     // Intentar igualdad estricta primero
@@ -610,7 +668,7 @@ export class ExecutionManager {
                     }
                     // Para cadenas, comparar después de normalizar
                     return actualStr === expectedStr;
-                    
+
                 case 'notEquals':
                     // Intentar desigualdad estricta primero
                     if (actual !== expected) return true;
@@ -620,7 +678,7 @@ export class ExecutionManager {
                     }
                     // Para cadenas, comparar después de normalizar
                     return actualStr !== expectedStr;
-                    
+
                 case 'contains':
                     // Para arrays, verificar si el valor está en el array
                     if (Array.isArray(actual)) {
@@ -628,40 +686,40 @@ export class ExecutionManager {
                     }
                     // Para objetos, verificar si alguna propiedad coincide
                     if (typeof actual === 'object' && actual !== null) {
-                        return Object.values(actual).some(val => 
+                        return Object.values(actual).some(val =>
                             String(val) === expectedStr
                         );
                     }
                     // Para strings, usar includes
                     return actualStr.includes(expectedStr);
-                    
+
                 case 'greaterThan':
                     return !isNaN(actualNum) && !isNaN(expectedNum) && actualNum > expectedNum;
-                    
+
                 case 'lessThan':
                     return !isNaN(actualNum) && !isNaN(expectedNum) && actualNum < expectedNum;
-                    
+
                 case 'exists':
                     if (Array.isArray(actual)) return actual.length > 0;
                     if (typeof actual === 'object' && actual !== null) return Object.keys(actual).length > 0;
                     return true; // Si llegamos aquí, el valor existe
-                    
+
                 case 'startsWith':
                     return actualStr.startsWith(expectedStr);
-                    
+
                 case 'endsWith':
                     return actualStr.endsWith(expectedStr);
-                    
+
                 default:
                     console.warn(`⚠️ Operador no reconocido: ${op}`);
                     return false;
             }
         };
-        
+
         try {
             // Obtener el valor a evaluar con el manejo especial para la estructura
             const fieldValue = getNestedValue(inputs, field);
-            
+
             // Registrar información detallada para depuración
             console.log(`🧐 Detalles de evaluación de condición:`, {
                 field,
@@ -675,10 +733,10 @@ export class ExecutionManager {
                 defaultLength: Array.isArray(inputs.default) ? inputs.default.length : 0,
                 inputKeys: Object.keys(inputs)
             });
-            
+
             // Evaluar la condición
             const conditionResult = compareValues(fieldValue, value, operator);
-            
+
             // Devolver resultado con metadatos detallados
             return {
                 success: true,
@@ -697,7 +755,7 @@ export class ExecutionManager {
         } catch (error) {
             // Manejar errores de forma detallada
             console.error('❌ Error en evaluación condicional:', error);
-            
+
             return {
                 success: false,
                 error: {
@@ -727,19 +785,19 @@ export class ExecutionManager {
             inputs: JSON.stringify(inputs, null, 2),
             config: JSON.stringify(config, null, 2)
         });
-    
+
         try {
             // Determinar qué datos usar para la transformación
             let inputData = inputs;
-            
+
             // Si inputs es un objeto con una propiedad 'default', usamos eso
             if (inputs && typeof inputs === 'object' && inputs.default !== undefined) {
                 inputData = inputs.default;
             }
-            
+
             // Aplicar la transformación usando el procesador
             const transformedData = processTransformation(inputData, config);
-            
+
             // Construir el resultado con metadata
             const result = {
                 success: true,
@@ -751,12 +809,12 @@ export class ExecutionManager {
                     transformApplied: config.transformType
                 }
             };
-            
-            console.log('[Transformer] Resultado de la transformación:', 
-                JSON.stringify(transformedData, null, 2).substring(0, 500) + 
+
+            console.log('[Transformer] Resultado de la transformación:',
+                JSON.stringify(transformedData, null, 2).substring(0, 500) +
                 (JSON.stringify(transformedData, null, 2).length > 500 ? '...' : '')
             );
-            
+
             return result;
         } catch (error) {
             console.error(`[Transformer] Error al aplicar transformación: ${error.message}`);
