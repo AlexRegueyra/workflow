@@ -1,51 +1,191 @@
-export const ResultViewer = ({ result }) => {
-    if (!result) return null;
+
+
+/**
+ * Versión simplificada para entorno de navegador)
+ */
+const DatabaseResultsViewer = {
+    /**
+     * Simula la prueba de conexión a una base de datos
+     * @param {Object} config - Configuración de la conexión
+     * @returns {Promise<Object>} - Resultado de la prueba
+     */
+    testConnection: async (config) => {
+      console.log('[DB API] Probando conexión:', { ...config, password: '******' });
+      
+      // Simular tiempo de respuesta de red
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Simulación de éxito/fracaso (80% éxito)
+      const success = Math.random() > 0.2;
+      
+      if (success) {
+        return {
+          success: true,
+          message: `Conexión exitosa a ${config.type} en ${config.host}:${config.port}/${config.database}`
+        };
+      } else {
+        return {
+          success: false,
+          message: `Error al conectar a ${config.type}: ${getRandomError(config.type)}`
+        };
+      }
+    },
     
-    // Si tenemos datos en formato tabular
-    if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        const columns = Object.keys(result.data[0]);
+    /**
+     * Simula la ejecución de una consulta en la base de datos
+     * @param {Object} config - Configuración de la conexión
+     * @param {string} query - Consulta a ejecutar
+     * @returns {Promise<Object>} - Resultado de la consulta
+     */
+    executeQuery: async (config, query) => {
+      console.log('[DB API] Ejecutando consulta:', query);
+      console.log('[DB API] Configuración:', { ...config, password: '******' });
+      
+      // Simular tiempo de respuesta de red
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Determinar el tipo de operación
+      const operation = determineOperationType(config.type, query);
+      
+      // Generar resultados simulados basados en el tipo de operación
+      let result;
+      
+      try {
+        if (operation === 'select' || operation === 'find') {
+          // Consulta de selección (SELECT o find)
+          result = {
+            success: true,
+            data: generateMockRecords(10),
+            rowsAffected: 10,
+            operation: operation
+          };
+        } else if (operation === 'insert') {
+          // Inserción (INSERT o insert)
+          result = {
+            success: true,
+            data: { insertId: Math.floor(Math.random() * 1000) + 1 },
+            rowsAffected: 1,
+            operation: operation
+          };
+        } else if (operation === 'update') {
+          // Actualización (UPDATE o update)
+          const rowsAffected = Math.floor(Math.random() * 5) + 1;
+          result = {
+            success: true,
+            data: { affectedRows: rowsAffected },
+            rowsAffected: rowsAffected,
+            operation: operation
+          };
+        } else if (operation === 'delete') {
+          // Eliminación (DELETE o delete)
+          const rowsAffected = Math.floor(Math.random() * 3) + 1;
+          result = {
+            success: true,
+            data: { affectedRows: rowsAffected },
+            rowsAffected: rowsAffected,
+            operation: operation
+          };
+        } else {
+          // Otra operación
+          result = {
+            success: true,
+            data: { message: 'Operación ejecutada' },
+            rowsAffected: 0,
+            operation: operation
+          };
+        }
         
-        return (
-            <div className="mt-4 overflow-auto max-h-96">
-                <h3 className="text-sm font-medium mb-2">Resultados ({result.data.length} filas)</h3>
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            {columns.map(col => (
-                                <th key={col} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    {col}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {result.data.map((row, idx) => (
-                            <tr key={idx}>
-                                {columns.map(col => (
-                                    <td key={col} className="px-3 py-2 text-sm text-gray-500">
-                                        {row[col]?.toString() || ''}
-                                    </td>
-                                ))}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        );
+        return result;
+      } catch (error) {
+        return {
+          success: false,
+          error: `Error al ejecutar la consulta: ${error.message}`,
+          data: null
+        };
+      }
     }
+  };
+  
+  /**
+   * Determina el tipo de operación basado en la consulta
+   * @param {string} dbType - Tipo de base de datos
+   * @param {string} query - Consulta a analizar
+   * @returns {string} - Tipo de operación
+   */
+  function determineOperationType(dbType, query) {
+    const queryLower = query.toLowerCase().trim();
     
-    // Para otros tipos de resultados
-    return (
-        <div className="mt-4">
-            <div className="bg-gray-50 p-3 rounded-md">
-                <div className="font-medium text-sm">{result.message || 'Operación completada'}</div>
-                {result.rowsAffected !== undefined && (
-                    <div className="text-sm text-gray-500">Filas afectadas: {result.rowsAffected}</div>
-                )}
-                {result.insertId && (
-                    <div className="text-sm text-gray-500">ID insertado: {result.insertId}</div>
-                )}
-            </div>
-        </div>
-    );
-};
+    if (dbType === 'mongodb') {
+      // Operaciones MongoDB
+      if (queryLower.startsWith('find')) return 'find';
+      if (queryLower.startsWith('insert')) return 'insert';
+      if (queryLower.startsWith('update')) return 'update';
+      if (queryLower.startsWith('delete')) return 'delete';
+      return 'unknown';
+    } else {
+      // Operaciones SQL
+      if (queryLower.startsWith('select')) return 'select';
+      if (queryLower.startsWith('insert')) return 'insert';
+      if (queryLower.startsWith('update')) return 'update';
+      if (queryLower.startsWith('delete')) return 'delete';
+      if (queryLower.startsWith('create')) return 'create';
+      if (queryLower.startsWith('alter')) return 'alter';
+      if (queryLower.startsWith('drop')) return 'drop';
+      return 'unknown';
+    }
+  }
+  
+  /**
+   * Genera registros simulados para pruebas
+   * @param {number} count - Número de registros a generar
+   * @returns {Array} - Array de registros
+   */
+  function generateMockRecords(count) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: i + 1,
+      nombre: `Usuario ${i + 1}`,
+      email: `usuario${i + 1}@ejemplo.com`,
+      edad: Math.floor(Math.random() * 50) + 18,
+      fecha_registro: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      activo: Math.random() > 0.3
+    }));
+  }
+  
+  /**
+   * Genera un error aleatorio basado en el tipo de base de datos
+   * @param {string} dbType - Tipo de base de datos
+   * @returns {string} - Mensaje de error
+   */
+  function getRandomError(dbType) {
+    const generalErrors = [
+      'Tiempo de espera agotado',
+      'Error de autenticación',
+      'Base de datos no encontrada',
+      'Permisos insuficientes'
+    ];
+    
+    const dbSpecificErrors = {
+      mysql: [
+        'Access denied for user',
+        'Unknown database',
+        'Too many connections'
+      ],
+      postgres: [
+        'FATAL: password authentication failed',
+        'database does not exist',
+        'role does not exist'
+      ],
+      mongodb: [
+        'Authentication failed',
+        'ECONNREFUSED',
+        'not authorized on database'
+      ]
+    };
+    
+    const specificErrors = dbSpecificErrors[dbType] || [];
+    const allErrors = [...generalErrors, ...specificErrors];
+    
+    return allErrors[Math.floor(Math.random() * allErrors.length)];
+  }
+  
+  export default DatabaseResultsViewer;
