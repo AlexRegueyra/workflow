@@ -144,17 +144,22 @@ const ConfigPanel = ({ node, connections = [], onUpdate, onClose, onDelete }) =>
                         />
                     </div>
                 );
-            case 'spreadsheet':
-            case 'hoja_calculo': // Añadimos ambas posibilidades para ser más flexibles
-                return (
-                    <div className="mt-4 mb-2 border-t pt-3">
-                        <h4 className="font-medium text-sm mb-3">Configuración de Hoja de Cálculo</h4>
-                        <SpreadsheetNodeConfig
-                            node={node}
-                            onChange={onUpdate}
-                        />
-                    </div>
-                );
+                case 'spreadsheet':
+                    case 'hoja_calculo':
+                        return (
+                            <div className="mt-4 mb-2 border-t pt-3">
+                                <h4 className="font-medium text-sm mb-3">Configuración de Hoja de Cálculo</h4>
+                                <SpreadsheetNodeConfig
+                                    node={{ 
+                                        id: node.id,
+                                        data: { config: node.config || {} }
+                                    }}
+                                    onChange={(updatedData) => {
+                                        onUpdate({ ...node, config: updatedData.config });
+                                    }}
+                                />
+                            </div>
+                        );
             default:
                 console.log("Tipo de nodo no reconocido:", nodeType);
                 return null;
