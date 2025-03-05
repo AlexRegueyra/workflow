@@ -1,5 +1,5 @@
 // executionManager.js
-
+import axios from 'axios';
 
 /**
  * Clase que maneja la ejecución de workflows y la integración con APIs reales
@@ -494,22 +494,110 @@ async executeDatabaseNode(node, inputs, options = {}) {
     /**
      * Ejecuta un nodo de hoja de cálculo (simulado)
      */
-    async executeSpreadsheetNode(node, inputs, options = {}) {
-        const config = node.data?.config || {};
+/**
+ * Ejecuta un nodo de hoja de cálculo con implementación real
+ */
+async executeSpreadsheetNode(node, inputs, options = {}) {
+    const config = node.data?.config || {};
+    const serverUrl = 'http://localhost:3001'; // O la URL de tu servidor
+    
+    try {
+        // Log para depuración
+        console.log("Ejecutando nodo de hoja de cálculo con config:", config);
+        
+        switch (config.serviceType) {
+            case 'google':
+                return await this.executeGoogleSheetsOperation(config, serverUrl);
+            
+            case 'excel_online':
+                return await this.executeExcelOnlineOperation(config, serverUrl);
+            
+            case 'excel_file':
+                return await this.executeExcelFileOperation(config, serverUrl);
+            
+            case 'csv':
+                return await this.executeCSVOperation(config, serverUrl);
+           
+            case 'mock':
+                return await this.executeMock(config, serverUrl);
 
-        await new Promise(resolve => setTimeout(resolve, 700));
-
+            default:
+                throw new Error('Tipo de servicio no soportado');
+        }
+    } catch (error) {
+        console.error('Error executing spreadsheet operation:', error);
         return {
-            success: true,
-            rowCount: Math.floor(Math.random() * 100),
-            message: 'Operación de hoja de cálculo simulada',
-            metadata: {
-                fileType: config.fileType,
-                sheetName: config.sheetName,
-                range: config.range
-            }
+            success: false,
+            message: `Error: ${error.message}`,
+            error: error.toString()
         };
     }
+}
+
+// Métodos auxiliares
+async executeGoogleSheetsOperation(config, serverUrl) {
+    try {
+        const response = await axios.post(`${serverUrl}/api/spreadsheet/google-sheets`, config);
+        return response.data;
+    } catch (error) {
+        console.error('Error en Google Sheets:', error);
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message
+        };
+    }
+}
+
+async executeExcelOnlineOperation(config, serverUrl) {
+    try {
+        const response = await axios.post(`${serverUrl}/api/spreadsheet/excel-online`, config);
+        return response.data;
+    } catch (error) {
+        console.error('Error en Excel Online:', error);
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message
+        };
+    }
+}
+
+async executeExcelFileOperation(config, serverUrl) {
+    try {
+        const response = await axios.post(`${serverUrl}/api/spreadsheet/excel-file`, config);
+        return response.data;
+    } catch (error) {
+        console.error('Error en Excel File:', error);
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message
+        };
+    }
+}
+
+async executeCSVOperation(config, serverUrl) {
+    try {
+        const response = await axios.post(`${serverUrl}/api/spreadsheet/csv`, config);
+        return response.data;
+    } catch (error) {
+        console.error('Error en CSV:', error);
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message
+        };
+    }
+}
+async executeMock(config, serverUrl) {
+    try {
+        const response = await axios.post(`${serverUrl}/api/spreadsheet/mock`, config);
+        return response.data;
+    } catch (error) {
+        console.error('Error en mock:', error);
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message
+        };
+    }
+}
 
     /**
      * Ejecuta un nodo de chatbot (simulado)
