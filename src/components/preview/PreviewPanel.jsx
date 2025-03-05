@@ -12,7 +12,7 @@ import {
     List,
     Eye
 } from 'lucide-react';
-import { ResultViewer } from '../../utils/resultsBd';
+import DatabaseResultsViewer from '../../utils/resultsBd';
 
 const PreviewPanel = ({
     isOpen,
@@ -155,7 +155,7 @@ const PreviewPanel = ({
                                 <ArrowRight className="w-4 h-4 mr-1" /> Salida del nodo
                             </h3>
                             {node.type === 'database' ? (
-                                <ResultViewer result={node.output} />
+                                <DatabaseResultsViewer result={node.output} />
                             ) : (
                                 <pre className="text-sm bg-gray-100 p-3 rounded-md overflow-x-auto border">
                                     {JSON.stringify(node.output, null, 2)}

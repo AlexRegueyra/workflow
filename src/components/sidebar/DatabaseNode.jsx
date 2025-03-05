@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react';
+// DatabaseNode.jsx - Nodo para operaciones de base de datos
+import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
+import dbApiService from '../services/dbApiService'; // Ajusta la ruta según la estructura de tu proyecto
 
 const DatabaseNode = ({ nodeId, inputs, config, onExecute }) => {
     useEffect(() => {
         console.log(`[Database] Ejecutando nodo de base de datos ${nodeId}`);
         console.log('[DEBUG] Datos recibidos:', JSON.stringify(inputs, null, 2).substring(0, 500) + '...');
-        console.log('[DEBUG] Configuración:', JSON.stringify(config, null, 2));
+        
+        // Crear copia segura de configuración (sin mostrar contraseña)
+        const safeConfig = { ...config };
+        if (safeConfig.password) {
+            safeConfig.password = '********';
+        }
+        console.log('[DEBUG] Configuración:', JSON.stringify(safeConfig, null, 2));
 
         // Si no hay inputs o configuración, no hacemos nada
         if (!inputs || !config) {
@@ -18,161 +26,97 @@ const DatabaseNode = ({ nodeId, inputs, config, onExecute }) => {
             return;
         }
 
-        try {
-            // Extraer la configuración de la base de datos
-            const { type, host, port, username, password, database, query } = config;
-
-            // Validar que se ha proporcionado la configuración básica
-            if (!type || !host || !port || !database) {
-                throw new Error('Configuración incompleta. Verifica los datos de conexión.');
-            }
-
-            // En un entorno real, aquí conectaríamos a la base de datos
-            // Por ahora, simulamos la operación
-            simulateDatabaseOperation(inputs, config)
-                .then(result => {
-                    console.log('[Database] Operación completada con éxito:', result);
-
-                    onExecute?.(nodeId, {
-                        success: true,
-                        data: result,
-                        metadata: {
-                            dbType: type,
-                            operation: 'query',
-                            rowsAffected: result.rowsAffected || result.data?.length || 0
-                        }
-                    });
-                })
-                .catch(error => {
-                    console.error('[Database] Error en operación:', error);
-
-                    onExecute?.(nodeId, {
-                        success: false,
-                        error: error.message,
-                        data: {},
-                        metadata: { error: true }
-                    });
+        executeRealDatabaseOperation(inputs, config)
+            .then(result => {
+                console.log('[Database] Operación completada con éxito:', result);
+                onExecute?.(nodeId, {
+                    success: true,
+                    data: result.data,
+                    message: result.message || 'Operación completada',
+                    metadata: {
+                        dbType: config.type,
+                        operation: result.operation,
+                        rowsAffected: result.rowsAffected || 0
+                    }
                 });
-        } catch (error) {
-            console.error('[Database] Error en el nodo:', error);
-
-            onExecute?.(nodeId, {
-                success: false,
-                error: error.message,
-                data: {},
-                metadata: { error: true }
+            })
+            .catch(error => {
+                console.error('[Database] Error en operación:', error);
+                onExecute?.(nodeId, {
+                    success: false,
+                    error: error.message,
+                    data: {},
+                    metadata: { error: true }
+                });
             });
-        }
     }, [nodeId, inputs, config, onExecute]);
 
     // Este componente no renderiza nada visible
     return null;
 };
 
-// Simulación de operación en base de datos (reemplazar por implementación real)
-const simulateDatabaseOperation = async (inputs, config) => {
-    return new Promise((resolve, reject) => {
-        // Simulamos un tiempo de respuesta de la base de datos
-        setTimeout(() => {
-            try {
-                const { type, query } = config;
+// Implementación de operación en base de datos usando el servicio API
+const executeRealDatabaseOperation = async (inputs, config) => {
+    try {
+        // Validar configuración mínima
+        if (!config.type || !config.host || !config.database) {
+            throw new Error('Configuración incompleta. Se requiere tipo, host y base de datos.');
+        }
 
-                // Procesamos la consulta para reemplazar variables
-                let processedQuery = query;
-
-                // Si hay una consulta, intentamos procesarla
-                if (query) {
-                    // Extraer variables de la consulta
-                    const variableMatches = query.match(/{{([^}]+)}}/g) || [];
-
-                    // Reemplazar variables con valores de los inputs
-                    variableMatches.forEach(match => {
-                        const variableName = match.replace(/{{|}}/g, '');
-                        let variableValue = '';
-
-                        // Intentar obtener el valor de la variable de los inputs
-                        if (inputs.default) {
-                            if (Array.isArray(inputs.default)) {
-                                // Si es un array, tomamos el primer elemento
-                                const firstItem = inputs.default[0];
-                                variableValue = firstItem[variableName] ||
-                                    (firstItem.data && firstItem.data[variableName]) ||
-                                    '';
-                            } else {
-                                // Si es un objeto
-                                variableValue = inputs.default[variableName] ||
-                                    (inputs.default.data && inputs.default.data[variableName]) ||
-                                    '';
-                            }
-                        } else {
-                            // Si no hay inputs.default, intentamos con el input directo
-                            variableValue = inputs[variableName] || '';
+        // Procesar la consulta SQL para reemplazar variables
+        let processedQuery = config.query || '';
+        
+        // Extraer variables de la consulta (formato {{variable}})
+        const variableMatches = processedQuery.match(/{{([^}]+)}}/g) || [];
+        
+        // Reemplazar variables con valores de los inputs
+        for (const match of variableMatches) {
+            const variableName = match.replace(/{{|}}/g, '');
+            let variableValue = '';
+            
+            // Navegar en la estructura de inputs para encontrar el valor
+            if (inputs && typeof inputs === 'object') {
+                // Caso 1: input.default es un array
+                if (inputs.default && Array.isArray(inputs.default)) {
+                    if (inputs.default.length > 0) {
+                        const firstItem = inputs.default[0];
+                        
+                        // Buscar en diferentes niveles: directo, .data, .default
+                        if (firstItem[variableName] !== undefined) {
+                            variableValue = firstItem[variableName];
+                        } else if (firstItem.data && firstItem.data[variableName] !== undefined) {
+                            variableValue = firstItem.data[variableName];
+                        } else if (firstItem.default && firstItem.default[variableName] !== undefined) {
+                            variableValue = firstItem.default[variableName];
                         }
-
-                        // Reemplazar en la consulta
-                        processedQuery = processedQuery.replace(match, variableValue);
-                    });
+                    }
                 }
-
-                console.log(`[Database] Ejecutando consulta: ${processedQuery}`);
-
-                // Simulamos diferentes tipos de respuestas según el tipo de DB
-                let result;
-
-                if (processedQuery.toLowerCase().includes('select')) {
-                    // Simulamos una consulta SELECT
-                    result = {
-                        success: true,
-                        operation: 'select',
-                        data: [
-                            { id: 1, name: 'Ejemplo 1', value: 100 },
-                            { id: 2, name: 'Ejemplo 2', value: 200 },
-                            { id: 3, name: 'Ejemplo 3', value: 300 }
-                        ],
-                        rowsAffected: 3,
-                        message: 'Consulta ejecutada correctamente'
-                    };
-                } else if (processedQuery.toLowerCase().includes('insert')) {
-                    // Simulamos una operación INSERT
-                    result = {
-                        success: true,
-                        operation: 'insert',
-                        insertId: 123,
-                        rowsAffected: 1,
-                        message: 'Registro insertado correctamente'
-                    };
-                } else if (processedQuery.toLowerCase().includes('update')) {
-                    // Simulamos una operación UPDATE
-                    result = {
-                        success: true,
-                        operation: 'update',
-                        rowsAffected: 5,
-                        message: 'Registros actualizados correctamente'
-                    };
-                } else if (processedQuery.toLowerCase().includes('delete')) {
-                    // Simulamos una operación DELETE
-                    result = {
-                        success: true,
-                        operation: 'delete',
-                        rowsAffected: 2,
-                        message: 'Registros eliminados correctamente'
-                    };
-                } else {
-                    // Operación desconocida
-                    result = {
-                        success: true,
-                        operation: 'unknown',
-                        message: 'Operación completada',
-                        query: processedQuery
-                    };
+                // Caso 2: input.default es un objeto
+                else if (inputs.default && typeof inputs.default === 'object') {
+                    if (inputs.default[variableName] !== undefined) {
+                        variableValue = inputs.default[variableName];
+                    } else if (inputs.default.data && inputs.default.data[variableName] !== undefined) {
+                        variableValue = inputs.default.data[variableName];
+                    }
                 }
-
-                resolve(result);
-            } catch (error) {
-                reject(new Error(`Error al procesar la consulta: ${error.message}`));
+                // Caso 3: buscar en el input directo
+                else if (inputs[variableName] !== undefined) {
+                    variableValue = inputs[variableName];
+                }
             }
-        }, 500); // Simulamos 500ms de tiempo de respuesta
-    });
+            
+            // Reemplazar en la consulta (asegurar que sea string)
+            processedQuery = processedQuery.replace(match, String(variableValue));
+        }
+        
+        console.log(`[Database] Consulta procesada: ${processedQuery}`);
+        
+        // Usar el servicio API para ejecutar la consulta
+        return await dbApiService.executeQuery(config, processedQuery);
+    } catch (error) {
+        console.error(`[Database] Error al ejecutar operación:`, error);
+        throw new Error(`Error en operación de base de datos: ${error.message}`);
+    }
 };
 
 DatabaseNode.propTypes = {

@@ -24,6 +24,7 @@ import {
 // Importar estilos para animaciones
 import '../../styles/ConnectionAnimations.css';
 import { useTelegramNotifications } from '../toolbar/Notification';
+import ServiceStatus from '../../services/ServiceStatus';
 
 const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
     const { success, error, info, warning } = useTelegramNotifications();
@@ -763,7 +764,7 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                 />
 
                 {/* Vista previa de datos (posicionamiento mejorado) */}
-                {showDataPreview && selectedNode && !connections.some(c => c.id === selectedNode.id) && (
+                {/* {showDataPreview && selectedNode && !connections.some(c => c.id === selectedNode.id) && (
                     <div className="absolute bottom-40 left-4 z-20 max-w-md">
                         <DataPreview
                             nodeId={selectedNode.id}
@@ -771,7 +772,11 @@ const Canvas = ({ initialNodes = [], initialConnections = [], onSave }) => {
                             isLoading={false}
                         />
                     </div>
-                )}
+                )} */}
+                 <div className="absolute bottom-40 left-4 z-20 max-w-md">
+                        <ServiceStatus
+                        />
+                    </div>
 
                 {/* Menú contextual */}
                 {contextMenu && (

@@ -63,8 +63,8 @@ const DatabaseNodeConfig = ({ node, onChange }) => {
                     <option value="mysql">MySQL</option>
                     <option value="postgres">PostgreSQL</option>
                     <option value="mongodb">MongoDB</option>
-                    <option value="sqlserver">SQL Server</option>
-                    <option value="oracle">Oracle</option>
+                    {/* <option value="sqlserver">SQL Server</option>
+                    <option value="oracle">Oracle</option> */}
                 </select>
             </div>
 
