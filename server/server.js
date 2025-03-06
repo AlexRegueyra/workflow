@@ -9,12 +9,78 @@ import axios from 'axios';
 import XLSX from 'xlsx';
 import fs from 'fs/promises';
 import Papa from 'papaparse';
+import multer from 'multer';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs/promises';
 
 // Inicializar dotenv
 dotenv.config();
 
 const app = express();
+// Obtener la ruta del directorio actual (necesario en módulos ES)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
+// Crear directorio para archivos temporales si no existe
+const uploadDir = join(__dirname, 'temp_uploads');
+try {
+    await fs.mkdir(uploadDir, { recursive: true });
+    console.log('Directorio de uploads creado:', uploadDir);
+} catch (err) {
+    console.error('Error al crear directorio de uploads:', err);
+}
+
+// Configurar multer para almacenar archivos
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        // Generar nombre único para el archivo
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = file.originalname.split('.').pop();
+        cb(null, `${uniqueSuffix}.${ext}`);
+    }
+});
+
+// Crear middleware de carga de archivos
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB máximo
+    fileFilter: (req, file, cb) => {
+        // Verificar tipo de archivo
+        const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        const allowedExtensions = ['.csv', '.xlsx', '.xls'];
+        const ext = '.' + file.originalname.split('.').pop().toLowerCase();
+
+        if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Formato de archivo no soportado. Solo se permiten CSV, XLS y XLSX.'));
+        }
+    }
+});
+
+// Endpoint para subir archivos
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            message: 'No se recibió ningún archivo'
+        });
+    }
+
+    // Devolver información del archivo
+    res.json({
+        success: true,
+        filePath: req.file.path,
+        fileName: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        message: 'Archivo subido correctamente'
+    });
+});
 // Middlewares esenciales (deben ir ANTES de las rutas)
 app.use(cors({
     origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
@@ -30,6 +96,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/', (req, res) => {
     res.send('API de Workflow Builder funcionando correctamente');
 });
+
 // Endpoint para verificar el estado del servidor
 app.get('/api/status', (req, res) => {
     res.json({
@@ -42,7 +109,7 @@ app.get('/api/status', (req, res) => {
 // Endpoint para operaciones de Google Sheets
 app.post('/api/spreadsheet/google-sheets', async (req, res) => {
     const config = req.body;
-    
+
     try {
         // Validar configuración requerida
         if (!config.spreadsheetId) {
@@ -55,14 +122,14 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
         // Parsear credenciales si existen
         let credentials;
         if (config.credentials) {
-            credentials = typeof config.credentials === 'string' 
-                ? JSON.parse(config.credentials) 
+            credentials = typeof config.credentials === 'string'
+                ? JSON.parse(config.credentials)
                 : config.credentials;
         }
 
         // Para operaciones de sólo lectura en hojas públicas, no se requieren credenciales
         let googleSheets;
-        
+
         if (credentials) {
             // Autenticar con Google Sheets API usando credenciales
             const client = new google.auth.GoogleAuth({
@@ -90,7 +157,7 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
                     message: 'Datos leídos exitosamente'
                 };
                 break;
-            
+
             case 'append':
                 if (!credentials) {
                     return res.status(400).json({
@@ -98,7 +165,7 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
                         message: 'Se requieren credenciales para operaciones de escritura'
                     });
                 }
-                
+
                 const appendResponse = await googleSheets.spreadsheets.values.append({
                     spreadsheetId: config.spreadsheetId,
                     range: config.range || 'Sheet1',
@@ -114,7 +181,7 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
                     message: 'Filas añadidas exitosamente'
                 };
                 break;
-            
+
             case 'update':
                 if (!credentials) {
                     return res.status(400).json({
@@ -122,7 +189,7 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
                         message: 'Se requieren credenciales para operaciones de escritura'
                     });
                 }
-                
+
                 const updateResponse = await googleSheets.spreadsheets.values.update({
                     spreadsheetId: config.spreadsheetId,
                     range: config.range || 'Sheet1',
@@ -137,7 +204,7 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
                     message: 'Celdas actualizadas exitosamente'
                 };
                 break;
-            
+
             case 'clear':
                 if (!credentials) {
                     return res.status(400).json({
@@ -145,7 +212,7 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
                         message: 'Se requieren credenciales para operaciones de escritura'
                     });
                 }
-                
+
                 const clearResponse = await googleSheets.spreadsheets.values.clear({
                     spreadsheetId: config.spreadsheetId,
                     range: config.range || 'Sheet1',
@@ -155,14 +222,14 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
                     message: 'Rango borrado exitosamente'
                 };
                 break;
-            
+
             default:
                 return res.status(400).json({
                     success: false,
                     message: 'Operación no soportada para Google Sheets'
                 });
         }
-        
+
         res.json(result);
     } catch (error) {
         console.error('Error en operación de Google Sheets:', error);
@@ -177,7 +244,7 @@ app.post('/api/spreadsheet/google-sheets', async (req, res) => {
 // Endpoint para operaciones de Excel Online
 app.post('/api/spreadsheet/excel-online', async (req, res) => {
     const config = req.body;
-    
+
     try {
         // Validar configuración requerida
         if (!config.fileUrl) {
@@ -200,7 +267,7 @@ app.post('/api/spreadsheet/excel-online', async (req, res) => {
         // Parsear archivo Excel
         const workbook = XLSX.read(response.data, { type: 'buffer' });
         const worksheet = workbook.Sheets[config.sheetName || workbook.SheetNames[0]];
-        
+
         // Convertir a array de arrays
         const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
@@ -223,7 +290,7 @@ app.post('/api/spreadsheet/excel-online', async (req, res) => {
 // Endpoint para operaciones de archivo Excel local
 app.post('/api/spreadsheet/excel-file', async (req, res) => {
     const config = req.body;
-    
+
     try {
         // Validar configuración requerida
         if (!config.filePath) {
@@ -235,11 +302,11 @@ app.post('/api/spreadsheet/excel-file', async (req, res) => {
 
         // Leer archivo
         const fileBuffer = await fs.readFile(config.filePath);
-        
+
         // Parsear archivo Excel
         const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
         const worksheet = workbook.Sheets[config.sheetName || workbook.SheetNames[0]];
-        
+
         // Convertir a array de arrays
         const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
@@ -262,7 +329,7 @@ app.post('/api/spreadsheet/excel-file', async (req, res) => {
 // Endpoint para operaciones de archivo CSV
 app.post('/api/spreadsheet/csv', async (req, res) => {
     const config = req.body;
-    
+
     try {
         // Validar configuración requerida
         if (!config.filePath) {
@@ -274,7 +341,7 @@ app.post('/api/spreadsheet/csv', async (req, res) => {
 
         // Leer archivo
         const fileContent = await fs.readFile(config.filePath, 'utf8');
-        
+
         // Parsear CSV
         Papa.parse(fileContent, {
             header: true,
@@ -347,3 +414,54 @@ app.get('/api/spreadsheet/mock1', (req, res) => {
         message: 'Datos de prueba cargados exitosamente (GET)'
     });
 });
+
+// Actualizar el endpoint de Excel en server.js
+app.post('/api/spreadsheet/excel-file', async (req, res) => {
+    const config = req.body;
+
+    try {
+        // Validar configuración requerida
+        if (!config.filePath) {
+            return res.status(400).json({
+                success: false,
+                message: 'Ruta de archivo no especificada'
+            });
+        }
+
+        // Verificar que el archivo existe
+        try {
+            await fs.access(config.filePath);
+        } catch (err) {
+            return res.status(400).json({
+                success: false,
+                message: 'Archivo no encontrado o no accesible'
+            });
+        }
+
+        // Leer archivo
+        const fileBuffer = await fs.readFile(config.filePath);
+
+        // Parsear archivo Excel
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+        const worksheet = workbook.Sheets[config.sheetName || workbook.SheetNames[0]];
+
+        // Convertir a array de arrays
+        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        res.json({
+            success: true,
+            data,
+            rowCount: data.length,
+            message: 'Datos leídos exitosamente'
+        });
+    } catch (error) {
+        console.error('Error en operación de archivo Excel:', error);
+        res.status(500).json({
+            success: false,
+            message: `Error: ${error.message}`,
+            error: error.toString()
+        });
+    }
+});
+
+  // Similar para el endpoint de CSV...
