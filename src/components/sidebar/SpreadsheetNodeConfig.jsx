@@ -59,13 +59,32 @@ async function executeExcelOnlineOperation(config, serverUrl) {
 
 async function executeExcelFileOperation(config, serverUrl) {
     try {
+        // Verificar que config tiene filePath y no está vacío
+        if (!config.filePath) {
+            console.error("executeExcelFileOperation: No se encontró filePath en la configuración", config);
+            return {
+                success: false,
+                message: "Ruta de archivo no especificada. Asegúrese de haber subido un archivo correctamente."
+            };
+        }
+
+        console.log("Enviando petición a Excel File con config:", config);
+        
         const response = await axios.post(`${serverUrl}/api/spreadsheet/excel-file`, config);
+        console.log("Respuesta de Excel File:", response.data);
         return response.data;
     } catch (error) {
         console.error('Error en Excel File:', error);
+        
+        let errorMsg = error.message;
+        if (error.response && error.response.data) {
+            errorMsg = error.response.data.message || errorMsg;
+            console.error("Detalles del error:", error.response.data);
+        }
+        
         return {
             success: false,
-            message: error.response?.data?.message || error.message
+            message: errorMsg
         };
     }
 }
@@ -86,13 +105,17 @@ async function executeCSVOperation(config, serverUrl) {
 // Componente de React para configurar nodos de hoja de cálculo
 const SpreadsheetNodeConfig = ({ node, onChange }) => {
     const config = node.data?.config || {};
-
-    // Manejar cambios en la configuración
+  
+    // Función para manejar cambios en la configuración
     const handleConfigChange = (key, value) => {
+        // Crea una copia del objeto config actual
         const newConfig = { ...config, [key]: value };
+        // Registrar el cambio para depuración
+        console.log(`Actualizando config['${key}'] a:`, value);
+        console.log("Config completa:", newConfig);
+        // Actualiza el estado en el componente padre
         onChange({ ...node.data, config: newConfig });
     };
-
     // Maneja cambio de operación
     const handleOperationChange = (e) => {
         handleConfigChange('operation', e.target.value);
@@ -345,38 +368,52 @@ const SpreadsheetNodeConfig = ({ node, onChange }) => {
         }
     };
 
-    // Agregar esta función al componente SpreadsheetNodeConfig
+  // Función para manejar la subida de archivos
     const uploadFile = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Crear FormData para enviar el archivo
         const formData = new FormData();
         formData.append('file', file);
 
         try {
-            // Mostrar indicador de carga
             handleConfigChange('isUploading', true);
 
-            // Enviar archivo al servidor
             const response = await axios.post('http://localhost:3001/api/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
-                }
+                },
+                timeout: 30000
             });
 
             if (response.data.success) {
-                // Guardar la información del archivo en la configuración
-                handleConfigChange('filePath', response.data.filePath);
-                handleConfigChange('fileName', response.data.originalName);
-                handleConfigChange('fileSize', response.data.size);
+                // IMPORTANTE: Usa el spread operator para mantener configuraciones previas
+                onChange({
+                    ...node.data,
+                    config: {
+                        ...node.data.config,
+                        filePath: response.data.filePath,
+                        fileName: response.data.fileName,
+                        originalName: response.data.originalName,
+                        fileSize: response.data.size,
+                        isUploading: false
+                    }
+                });
+
+                console.log("Archivo subido. Configuración completa:", {
+                    filePath: response.data.filePath,
+                    fileName: response.data.fileName,
+                    originalName: response.data.originalName,
+                    fileSize: response.data.size
+                });
+
                 alert(`Archivo subido exitosamente: ${response.data.originalName}`);
+            } else {
+                alert(`Error al subir el archivo: ${response.data.message}`);
             }
         } catch (error) {
             console.error("Error al subir archivo:", error);
-            alert(`Error al subir el archivo: ${error.message}`);
-        } finally {
-            handleConfigChange('isUploading', false);
+            alert("Error al subir el archivo");
         }
     };
 

@@ -492,112 +492,130 @@ async executeDatabaseNode(node, inputs, options = {}) {
     }
 
     /**
-     * Ejecuta un nodo de hoja de cálculo (simulado)
+     * Ejecuta un nodo de hoja de cálculo con implementación real
      */
-/**
- * Ejecuta un nodo de hoja de cálculo con implementación real
- */
-async executeSpreadsheetNode(node, inputs, options = {}) {
-    const config = node.data?.config || {};
-    const serverUrl = 'http://localhost:3001'; // O la URL de tu servidor
-    
-    try {
-        // Log para depuración
-        console.log("Ejecutando nodo de hoja de cálculo con config:", config);
-        
-        switch (config.serviceType) {
-            case 'google':
-                return await this.executeGoogleSheetsOperation(config, serverUrl);
-            
-            case 'excel_online':
-                return await this.executeExcelOnlineOperation(config, serverUrl);
-            
-            case 'excel_file':
-                return await this.executeExcelFileOperation(config, serverUrl);
-            
-            case 'csv':
-                return await this.executeCSVOperation(config, serverUrl);
-           
-            case 'mock':
-                return await this.executeMock(config, serverUrl);
+    async executeSpreadsheetNode(node, inputs, options = {}) {
+        const config = node.data?.config || {};
+        console.log("Configuración completa del nodo:", config);
+        const serverUrl = 'http://localhost:3001'; // O la URL de tu servidor
 
-            default:
-                throw new Error('Tipo de servicio no soportado');
+        try {
+            // Log para depuración
+            console.log("Ejecutando nodo de hoja de cálculo con config:", config);
+
+            switch (config.serviceType) {
+                case 'google':
+                    return await this.executeGoogleSheetsOperation(config, serverUrl);
+
+                case 'excel_online':
+                    return await this.executeExcelOnlineOperation(config, serverUrl);
+
+                case 'excel_file':
+                    return await this.executeExcelFileOperation(config, serverUrl);
+
+                case 'csv':
+                    return await this.executeCSVOperation(config, serverUrl);
+
+                case 'mock':
+                    return await this.executeMock(config, serverUrl);
+
+                default:
+                    throw new Error('Tipo de servicio no soportado');
+            }
+        } catch (error) {
+            console.error('Error executing spreadsheet operation:', error);
+            return {
+                success: false,
+                message: `Error: ${error.message}`,
+                error: error.toString()
+            };
         }
-    } catch (error) {
-        console.error('Error executing spreadsheet operation:', error);
-        return {
-            success: false,
-            message: `Error: ${error.message}`,
-            error: error.toString()
-        };
     }
-}
 
-// Métodos auxiliares
-async executeGoogleSheetsOperation(config, serverUrl) {
-    try {
-        const response = await axios.post(`${serverUrl}/api/spreadsheet/google-sheets`, config);
-        return response.data;
-    } catch (error) {
-        console.error('Error en Google Sheets:', error);
-        return {
-            success: false,
-            message: error.response?.data?.message || error.message
-        };
+    // Métodos auxiliares
+    async executeGoogleSheetsOperation(config, serverUrl) {
+        try {
+            const response = await axios.post(`${serverUrl}/api/spreadsheet/google-sheets`, config);
+            return response.data;
+        } catch (error) {
+            console.error('Error en Google Sheets:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || error.message
+            };
+        }
     }
-}
 
-async executeExcelOnlineOperation(config, serverUrl) {
-    try {
-        const response = await axios.post(`${serverUrl}/api/spreadsheet/excel-online`, config);
-        return response.data;
-    } catch (error) {
-        console.error('Error en Excel Online:', error);
-        return {
-            success: false,
-            message: error.response?.data?.message || error.message
-        };
+    async executeExcelOnlineOperation(config, serverUrl) {
+        try {
+            const response = await axios.post(`${serverUrl}/api/spreadsheet/excel-online`, config);
+            return response.data;
+        } catch (error) {
+            console.error('Error en Excel Online:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || error.message
+            };
+        }
     }
-}
 
-async executeExcelFileOperation(config, serverUrl) {
-    try {
-        const response = await axios.post(`${serverUrl}/api/spreadsheet/excel-file`, config);
-        return response.data;
-    } catch (error) {
-        console.error('Error en Excel File:', error);
-        return {
-            success: false,
-            message: error.response?.data?.message || error.message
-        };
-    }
-}
+    async executeExcelFileOperation(config, serverUrl) {
+        try {
+            // Verificar que config tiene filePath
+            if (!config.filePath) {
+                console.error("executeExcelFileOperation: No se encontró filePath en la configuración", config);
+                return {
+                    success: false,
+                    message: "Ruta de archivo no especificada. Asegúrese de haber subido un archivo."
+                };
+            }
 
-async executeCSVOperation(config, serverUrl) {
-    try {
-        const response = await axios.post(`${serverUrl}/api/spreadsheet/csv`, config);
-        return response.data;
-    } catch (error) {
-        console.error('Error en CSV:', error);
-        return {
-            success: false,
-            message: error.response?.data?.message || error.message
-        };
+            console.log("Enviando petición a Excel File con config:", config);
+
+            const response = await axios.post(`${serverUrl}/api/spreadsheet/excel-file`, config);
+            console.log("Respuesta de Excel File:", response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error en Excel File:', error);
+
+            // Mensaje detallado para depuración
+            let errorMsg = error.message;
+            if (error.response && error.response.data) {
+                errorMsg = error.response.data.message || errorMsg;
+                console.error("Detalles del error:", error.response.data);
+            }
+
+            return {
+                success: false,
+                message: errorMsg
+            };
+        }
     }
-}
-async executeMock(config, serverUrl) {
-    try {
-        const response = await axios.post(`${serverUrl}/api/spreadsheet/mock`, config);
-        return response.data;
-    } catch (error) {
-        console.error('Error en mock:', error);
-        return {
-            success: false,
-            message: error.response?.data?.message || error.message
-        };
+
+    async executeCSVOperation(config, serverUrl) {
+        try {
+            const response = await axios.post(`${serverUrl}/api/spreadsheet/csv`, config);
+            return response.data;
+        } catch (error) {
+            console.error('Error en CSV:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || error.message
+            };
+        }
     }
-}
+    async executeMock(config, serverUrl) {
+        try {
+            const response = await axios.post(`${serverUrl}/api/spreadsheet/mock`, config);
+            return response.data;
+        } catch (error) {
+            console.error('Error en mock:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || error.message
+            };
+        }
+    }
 
     /**
      * Ejecuta un nodo de chatbot (simulado)

@@ -3,24 +3,34 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { google } from 'googleapis';
 import axios from 'axios';
 import XLSX from 'xlsx';
 import fs from 'fs/promises';
 import Papa from 'papaparse';
 import multer from 'multer';
-import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import fs from 'fs/promises';
 
 // Inicializar dotenv
 dotenv.config();
 
+// Inicializar Express - PRIMERO antes de usarlo
 const app = express();
+
 // Obtener la ruta del directorio actual (necesario en módulos ES)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Middlewares esenciales (DESPUÉS de inicializar app)
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// IMPORTANTE: Estos middlewares deben estar presentes
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Crear directorio para archivos temporales si no existe
 const uploadDir = join(__dirname, 'temp_uploads');
@@ -60,41 +70,6 @@ const upload = multer({
             cb(new Error('Formato de archivo no soportado. Solo se permiten CSV, XLS y XLSX.'));
         }
     }
-});
-
-// Endpoint para subir archivos
-app.post('/api/upload', upload.single('file'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({
-            success: false,
-            message: 'No se recibió ningún archivo'
-        });
-    }
-
-    // Devolver información del archivo
-    res.json({
-        success: true,
-        filePath: req.file.path,
-        fileName: req.file.filename,
-        originalName: req.file.originalname,
-        size: req.file.size,
-        message: 'Archivo subido correctamente'
-    });
-});
-// Middlewares esenciales (deben ir ANTES de las rutas)
-app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// IMPORTANTE: Asegúrate de que estos middlewares estén presentes
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Rutas
-app.get('/', (req, res) => {
-    res.send('API de Workflow Builder funcionando correctamente');
 });
 
 // Endpoint para verificar el estado del servidor
@@ -290,13 +265,24 @@ app.post('/api/spreadsheet/excel-online', async (req, res) => {
 // Endpoint para operaciones de archivo Excel local
 app.post('/api/spreadsheet/excel-file', async (req, res) => {
     const config = req.body;
-
+    console.log("Recibida solicitud para archivo Excel:", config);
     try {
         // Validar configuración requerida
         if (!config.filePath) {
+            console.error("Ruta de archivo no proporcionada");
             return res.status(400).json({
                 success: false,
                 message: 'Ruta de archivo no especificada'
+            });
+        }
+
+        // Verificar que el archivo existe
+        try {
+            await fs.access(config.filePath);
+        } catch (err) {
+            return res.status(400).json({
+                success: false,
+                message: 'Archivo no encontrado o no accesible'
             });
         }
 
@@ -342,26 +328,24 @@ app.post('/api/spreadsheet/csv', async (req, res) => {
         // Leer archivo
         const fileContent = await fs.readFile(config.filePath, 'utf8');
 
-        // Parsear CSV
-        Papa.parse(fileContent, {
-            header: true,
-            dynamicTyping: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                res.json({
-                    success: true,
-                    data: results.data,
-                    rowCount: results.data.length,
-                    message: 'Datos CSV leídos exitosamente'
-                });
-            },
-            error: (error) => {
-                res.status(500).json({
-                    success: false,
-                    message: 'Error al parsear CSV',
-                    error: error.toString()
-                });
-            }
+        // Parsear CSV con promesa para manejar correctamente respuestas asíncronas
+        const parsePromise = new Promise((resolve, reject) => {
+            Papa.parse(fileContent, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: (results) => resolve(results),
+                error: (error) => reject(error)
+            });
+        });
+
+        const results = await parsePromise;
+
+        res.json({
+            success: true,
+            data: results.data,
+            rowCount: results.data.length,
+            message: 'Datos CSV leídos exitosamente'
         });
     } catch (error) {
         console.error('Error en operación de archivo CSV:', error);
@@ -373,18 +357,27 @@ app.post('/api/spreadsheet/csv', async (req, res) => {
     }
 });
 
-// Ruta básica para verificar que el servidor está funcionando
-app.get('/', (req, res) => {
-    res.send('API de Workflow Builder funcionando correctamente');
+// Endpoint para subir archivos
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            message: 'No se recibió ningún archivo'
+        });
+    }
+    
+    // Devolver información del archivo
+    res.json({
+        success: true,
+        filePath: req.file.path,
+        fileName: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        message: 'Archivo subido correctamente'
+    });
 });
 
-// Iniciar servidor
-const port = process.env.PORT || 3001;
-app.listen(port, () => {
-    console.log(`Servidor iniciado en http://localhost:${port}`);
-});
-
-// En server.js, añade este nuevo endpoint
+// En server.js, añade este nuevo endpoint para datos de prueba
 app.post('/api/spreadsheet/mock', (req, res) => {
     res.json({
         success: true,
@@ -415,53 +408,13 @@ app.get('/api/spreadsheet/mock1', (req, res) => {
     });
 });
 
-// Actualizar el endpoint de Excel en server.js
-app.post('/api/spreadsheet/excel-file', async (req, res) => {
-    const config = req.body;
-
-    try {
-        // Validar configuración requerida
-        if (!config.filePath) {
-            return res.status(400).json({
-                success: false,
-                message: 'Ruta de archivo no especificada'
-            });
-        }
-
-        // Verificar que el archivo existe
-        try {
-            await fs.access(config.filePath);
-        } catch (err) {
-            return res.status(400).json({
-                success: false,
-                message: 'Archivo no encontrado o no accesible'
-            });
-        }
-
-        // Leer archivo
-        const fileBuffer = await fs.readFile(config.filePath);
-
-        // Parsear archivo Excel
-        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-        const worksheet = workbook.Sheets[config.sheetName || workbook.SheetNames[0]];
-
-        // Convertir a array de arrays
-        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-        res.json({
-            success: true,
-            data,
-            rowCount: data.length,
-            message: 'Datos leídos exitosamente'
-        });
-    } catch (error) {
-        console.error('Error en operación de archivo Excel:', error);
-        res.status(500).json({
-            success: false,
-            message: `Error: ${error.message}`,
-            error: error.toString()
-        });
-    }
+// Ruta básica para verificar que el servidor está funcionando
+app.get('/', (req, res) => {
+    res.send('API de Workflow Builder funcionando correctamente');
 });
 
-  // Similar para el endpoint de CSV...
+// Iniciar servidor
+const port = process.env.PORT || 3001;
+app.listen(port, () => {
+    console.log(`Servidor iniciado en http://localhost:${port}`);
+});
