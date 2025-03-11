@@ -133,7 +133,9 @@ const evaluateExpression = (expression, data) => {
 };
 
 // Función principal que aplica transformaciones
+// Función principal que aplica transformaciones
 const processTransformation = (data, configObj) => {
+
     // Si los datos están vacíos, devolvemos un objeto vacío
     if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
         console.warn('Datos de entrada vacíos para el transformador');
@@ -181,6 +183,54 @@ const processTransformation = (data, configObj) => {
     }
     
     console.log(`Aplicando transformación de tipo: ${transformType} con config:`, config);
+    
+    // Detectar si estamos trabajando con datos de Excel
+    const isExcelData = detectExcelData(data);
+
+    if (transformType === 'excel' || isExcelData) {
+        console.log('Procesando datos de Excel');
+        // Extraer los datos Excel
+        let excelData = data;
+        
+        // Si es una respuesta del nodo Excel
+        if (data && data.data && Array.isArray(data.data)) {
+            excelData = data.data;
+        }
+        
+        // Procesar según la configuración
+        const operation = config.operation || 'select_columns';
+        
+        // Declarar la variable result
+        let result;
+        
+        switch (operation) {
+            case 'select_columns':
+                result = selectExcelColumns(excelData, config);
+                break;
+            case 'filter_rows':
+                result = filterExcelRows(excelData, config);
+                break;
+            case 'sort':
+                result = sortExcelData(excelData, config);
+                break;
+            case 'limit':
+                result = limitExcelRows(excelData, config);
+                break;
+            default:
+                result = excelData;
+        }
+        
+        // Mantener estructura original si es necesario
+        if (data && data.data && Array.isArray(data.data)) {
+            return {
+                ...data,
+                data: result,
+                transformApplied: operation
+            };
+        }
+        
+        return result; // Importante: Retornar aquí para salir de la función
+    }
     
     try {
         // Procesar los datos dependiendo del tipo de transformación
@@ -940,10 +990,342 @@ const flattenArray = (arr, depth) => {
     }, []);
 };
 
+
+// Añadir esta función en tu archivo transformerProcessor.js
+function detectExcelData(data) {
+    // Verifica si es una respuesta típica del nodo Excel
+    if (data && data.data && Array.isArray(data.data) && 
+        data.success === true && data.message === 'Datos leídos exitosamente') {
+        return true;
+    }
+    
+    // Si data es un array de arrays (estructura típica de Excel)
+    if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0])) {
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Limita el número de filas en los resultados Excel
+ */
+function limitExcelRows(data, config) {
+    const { limit } = config;
+    
+    if (!limit || limit <= 0 || limit >= data.length) {
+        return data;
+    }
+    
+    // Si es array de arrays, preservar el encabezado
+    if (Array.isArray(data[0])) {
+        return [data[0]].concat(data.slice(1, limit + 1));
+    }
+    
+    return data.slice(0, limit);
+}
+
+/**
+ * Selecciona columnas específicas de los datos Excel
+ */
+function selectExcelColumns(data, config) {
+    // Convertir datos a formato de objetos si es un array de arrays
+    let processedData = data;
+    
+    if (Array.isArray(data[0])) {
+        const headers = data[0];
+        processedData = data.slice(1).map(row => {
+            const obj = {};
+            headers.forEach((header, index) => {
+                if (header) {
+                    obj[header] = row[index];
+                }
+            });
+            return obj;
+        });
+    }
+    
+    const { columns } = config;
+    
+    // Si no hay columnas, devolver todos los datos
+    if (!columns || !Array.isArray(columns) || columns.length === 0) {
+        return processedData;
+    }
+    
+    // Filtrar columnas
+    return processedData.map(row => {
+        const newRow = {};
+        columns.forEach(column => {
+            if (column in row) {
+                newRow[column] = row[column];
+            }
+        });
+        return newRow;
+    });
+}
+
+/**
+ * Filtra filas de Excel basadas en una condición
+ */
+// function filterExcelRows(data, config) {
+//     // Convertir datos a formato de objetos si es necesario
+//     let processedData = data;
+    
+//     if (Array.isArray(data[0])) {
+//         const headers = data[0];
+//         processedData = data.slice(1).map(row => {
+//             const obj = {};
+//             headers.forEach((header, index) => {
+//                 if (header) {
+//                     obj[header] = row[index];
+//                 }
+//             });
+//             return obj;
+//         });
+//     }
+    
+//     const { filterCondition } = config;
+    
+//     if (!filterCondition) {
+//         return processedData;
+//     }
+    
+//     try {
+//         // Crear función de filtro
+//         const filterFunc = new Function('row', `return ${filterCondition};`);
+        
+//         return processedData.filter(row => {
+//             try {
+//                 return filterFunc(row);
+//             } catch (err) {
+//                 console.error('Error al evaluar condición:', err);
+//                 return false;
+//             }
+//         });
+//     } catch (err) {
+//         console.error('Error al crear función de filtro:', err);
+//         return processedData;
+//     }
+// }
+function filterExcelRows(data, config) {
+    // Convertir datos a formato de objetos si es necesario
+    let processedData = data;
+    
+    if (Array.isArray(data[0])) {
+        const headers = data[0];
+        processedData = data.slice(1).map(row => {
+            const obj = {};
+            headers.forEach((header, index) => {
+                if (header) {
+                    obj[header] = row[index];
+                }
+            });
+            return obj;
+        });
+    }
+    
+    const { filterCondition } = config;
+    
+    if (!filterCondition || filterCondition.trim() === '') {
+        return processedData;
+    }
+    
+    // Intentar extraer la columna, operador y valor de la condición
+    const conditionMatch = filterCondition.match(/([^=!<>]+)\s*([=!<>]+)\s*(.+)/);
+    
+    if (!conditionMatch) {
+        console.error('Formato de condición inválido:', filterCondition);
+        return processedData;
+    }
+    
+    const column = conditionMatch[1].trim();
+    const operator = conditionMatch[2];
+    let value = conditionMatch[3].trim();
+    
+    // Quitar comillas si existen
+    if ((value.startsWith('"') && value.endsWith('"')) || 
+        (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.substring(1, value.length - 1);
+    }
+    
+    console.log("Filtro analizado:", { column, operator, value });
+    
+    // Aplicar el filtro manualmente
+    return processedData.filter(row => {
+        const cellValue = row[column];
+        
+        switch (operator) {
+            case '===':
+            case '==':
+                return cellValue == value;
+            case '!==':
+            case '!=':
+                return cellValue != value;
+            case '>':
+                return Number(cellValue) > Number(value);
+            case '<':
+                return Number(cellValue) < Number(value);
+            case '>=':
+                return Number(cellValue) >= Number(value);
+            case '<=':
+                return Number(cellValue) <= Number(value);
+            default:
+                return true;
+        }
+    });
+}
+
+/**
+ * Ordena los datos Excel por una columna
+ */
+function sortExcelData(data, config) {
+    // Convertir datos a formato de objetos si es necesario
+    let processedData = data;
+    
+    if (Array.isArray(data[0])) {
+        const headers = data[0];
+        processedData = data.slice(1).map(row => {
+            const obj = {};
+            headers.forEach((header, index) => {
+                if (header) {
+                    obj[header] = row[index];
+                }
+            });
+            return obj;
+        });
+    }
+    
+    const { sortBy, sortDirection } = config;
+    
+    if (!sortBy) {
+        return processedData;
+    }
+    
+    // Implementación nativa sin lodash
+    return processedData.sort((a, b) => {
+        let valueA = a[sortBy];
+        let valueB = b[sortBy];
+        
+        // Convertir a número si ambos son numéricos
+        if (!isNaN(Number(valueA)) && !isNaN(Number(valueB))) {
+            valueA = Number(valueA);
+            valueB = Number(valueB);
+        }
+        
+        // Ordenamiento ascendente/descendente
+        if (sortDirection === 'desc') {
+            return valueA > valueB ? -1 : valueA < valueB ? 1 : 0;
+        } else {
+            return valueA < valueB ? -1 : valueA > valueB ? 1 : 0;
+        }
+    });
+}
+
+/**
+ * Crea una tabla dinámica (pivot) con los datos Excel
+ */
+function pivotExcelData(data, config) {
+    // Primero convertir a formato de objetos si es necesario
+    let processedData = data;
+    
+    if (Array.isArray(data[0])) {
+        const headers = data[0];
+        processedData = data.slice(1).map(row => {
+            const obj = {};
+            headers.forEach((header, index) => {
+                if (header) {
+                    obj[header] = row[index];
+                }
+            });
+            return obj;
+        });
+    }
+    
+    const { rowField, columnField, valueField, aggregateFunction } = config;
+    
+    if (!rowField || !columnField || !valueField) {
+        console.error('Faltan campos para la tabla dinámica');
+        return processedData;
+    }
+    
+    // Agrupar por fila
+    const grouped = {};
+    processedData.forEach(row => {
+        const rowValue = String(row[rowField] || 'null');
+        
+        if (!grouped[rowValue]) {
+            grouped[rowValue] = [];
+        }
+        
+        grouped[rowValue].push(row);
+    });
+    
+    // Obtener valores únicos para columnas
+    const uniqueColumns = [...new Set(processedData.map(row => row[columnField]))].filter(Boolean);
+    
+    // Crear tabla dinámica
+    const result = Object.keys(grouped).map(rowValue => {
+        const pivotRow = { [rowField]: rowValue };
+        
+        uniqueColumns.forEach(colValue => {
+            // Filtrar datos que coinciden con esta fila y columna
+            const cellData = grouped[rowValue].filter(row => 
+                String(row[columnField]) === String(colValue)
+            );
+            
+            // Aplicar función de agregación a los valores
+            pivotRow[colValue] = aggregateValues(
+                cellData.map(row => row[valueField]), 
+                aggregateFunction || 'count'
+            );
+        });
+        
+        return pivotRow;
+    });
+    
+    return result;
+}
+
+/**
+ * Función auxiliar para agregación de valores
+ */
+function aggregateValues(values, funcName) {
+    // Filtrar valores null/undefined
+    const filteredValues = values.filter(val => val !== null && val !== undefined);
+    
+    if (filteredValues.length === 0) return null;
+    
+    switch (funcName) {
+        case 'sum':
+            return filteredValues.reduce((sum, val) => sum + (Number(val) || 0), 0);
+        
+        case 'avg':
+            const sum = filteredValues.reduce((acc, val) => acc + (Number(val) || 0), 0);
+            return filteredValues.length ? sum / filteredValues.length : 0;
+        
+        case 'min':
+            return Math.min(...filteredValues.map(v => Number(v) || 0));
+        
+        case 'max':
+            return Math.max(...filteredValues.map(v => Number(v) || 0));
+        
+        case 'count':
+        default:
+            return filteredValues.length;
+    }
+}
+
 // Exportar funciones para uso externo
 export {
     processTransformation,
     getNestedValue,
     setNestedValue,
-    evaluateExpression
+    evaluateExpression,
+    // Funciones para Excel
+    limitExcelRows,
+    selectExcelColumns,
+    filterExcelRows,
+    sortExcelData,
+    pivotExcelData,
+    detectExcelData
 };

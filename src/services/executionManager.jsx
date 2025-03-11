@@ -1,5 +1,11 @@
 // executionManager.js
 import axios from 'axios';
+import { processTransformation, 
+    limitExcelRows,
+    selectExcelColumns,
+    filterExcelRows,
+    sortExcelData,
+    pivotExcelData  } from '../components/sidebar/transformerProcessor';
 
 /**
  * Clase que maneja la ejecución de workflows y la integración con APIs reales

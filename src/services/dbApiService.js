@@ -21,12 +21,14 @@ const dbApiService = {
                 throw new Error("El servidor respondió con un error");
             }
         } catch (error) {
-            console.log("Error al verificar estado del servicio:", error);
-            return {
-                active: false,
-                mode: "simulation",
-                message: "No se pudo conectar al servidor. Usando modo simulación."
-            };
+          console.log("hola");
+          console.log("Error al verificar estado del servicio:", error);
+          return {
+            active: false,
+            mode: "simulation",
+            message: "No se pudo conectar al servidor. Usando modo simulación."
+          };
+
         }
     },
 
