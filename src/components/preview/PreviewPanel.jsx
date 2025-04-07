@@ -147,7 +147,7 @@ const PreviewPanel = ({
                             No hay logs disponibles para este nodo
                         </div>
                     )}
-                
+
 
                     {node.output && (
                         <div className="mt-4">
@@ -186,6 +186,8 @@ const PreviewPanel = ({
             </div>
         );
     };
+
+
 
     // Componente para mostrar el log completo de ejecución del workflow
     const ExecutionLogModal = () => {

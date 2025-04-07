@@ -8,7 +8,7 @@ import HistoryModal from './components/modal/HistoryModal';
 // Reemplazamos la importación directa del PreviewPanel
 // import PreviewPanel from './components/preview/PreviewPanel';
 // Y en su lugar importamos el ExecutionController que a su vez usa el PreviewPanel mejorado
-import ExecutionController from './components/preview/ExecutionController'; 
+import ExecutionController from './components/preview/ExecutionController';
 
 import { useTelegramNotifications } from './components/toolbar/Notification';
 import { exportAsImage, exportAsJson } from './utils/workflowUtils';
@@ -260,31 +260,31 @@ function App() {
     const validateWorkflow = () => {
         const errors = [];
         const warnings = [];
-    
+
         // Validar que haya nodos
         if (workflowNodes.length === 0) {
             errors.push('El workflow debe tener al menos un nodo');
             return { valid: false, errors, warnings };
         }
-    
+
         // Validar conexiones
         if (workflowNodes.length > 1 && workflowConnections.length === 0) {
             errors.push('Los nodos deben estar conectados');
         }
-    
+
         // Validar configuración de nodos - adaptado a tu estructura real
         workflowNodes.forEach(node => {
             if (!node.config || Object.keys(node.config || {}).length === 0) {
                 errors.push(`El nodo "${node.name || node.id}" no está configurado`);
             }
-    
+
             // Validaciones específicas por tipo
             const nodeType = node.service?.id;
             if (nodeType === 'api_rest') {
                 if (!node.config?.url) {
                     errors.push(`El nodo "${node.name || node.id}" debe tener una URL configurada`);
                 }
-    
+
                 // Validar método HTTP
                 if (!node.config?.method) {
                     warnings.push(`El nodo "${node.name || node.id}" no tiene un método HTTP configurado, se usará GET por defecto`);
@@ -302,7 +302,7 @@ function App() {
                 }
             }
         });
-    
+
         // Usar también la validación del contexto
         try {
             // Adaptar los nodos para la validación del contexto
@@ -314,7 +314,7 @@ function App() {
                     config: node.config || {}
                 }
             }));
-            
+
             const contextValidation = validateWorkflowContext(adaptedNodesForValidation, workflowConnections);
             if (!contextValidation.valid) {
                 contextValidation.issues.forEach(issue => {
@@ -328,7 +328,7 @@ function App() {
         } catch (e) {
             console.error('Error en validación avanzada:', e);
         }
-    
+
         return {
             valid: errors.length === 0,
             errors,

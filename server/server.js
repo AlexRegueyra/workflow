@@ -10,12 +10,15 @@ import fs from 'fs/promises';
 import Papa from 'papaparse';
 import multer from 'multer';
 import { dirname, join } from 'path';
+import mysql from 'mysql2/promise';
+
 
 // Inicializar dotenv
 dotenv.config();
 
 // Inicializar Express - PRIMERO antes de usarlo
 const app = express();
+// const mysql = require('mysql');
 
 // Obtener la ruta del directorio actual (necesario en módulos ES)
 const __filename = fileURLToPath(import.meta.url);
@@ -365,7 +368,7 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
             message: 'No se recibió ningún archivo'
         });
     }
-    
+
     // Devolver información del archivo
     res.json({
         success: true,
@@ -411,6 +414,134 @@ app.get('/api/spreadsheet/mock1', (req, res) => {
 // Ruta básica para verificar que el servidor está funcionando
 app.get('/', (req, res) => {
     res.send('API de Workflow Builder funcionando correctamente');
+});
+
+
+// app.post('/api/database/execute-query', async (req, res) => {
+//     let query = null; // Definir query antes del try para que siempre exista
+
+//     try {
+//         const { config, query: receivedQuery } = req.body;
+//         query = receivedQuery; // Asignar el query recibido
+
+//         if (!config || !query) {
+//             return res.status(400).json({
+//                 success: false,
+//                 error: 'Se requiere configuración y consulta SQL',
+//                 query: query // Siempre se envía, aunque sea null
+//             });
+//         }
+
+//         // Imprimir la consulta SQL recibida
+//         console.log('[QUERY RECIBIDA]:', query);
+
+//         // Crear conexión a la base de datos con los datos recibidos
+//         const connection = await mysql.createConnection({
+//             host: config.host,
+//             user: config.user,
+//             password: config.password,
+//             database: config.database,
+//             port: config.port || 3306 // Puerto opcional, por defecto 3306
+//         });
+
+//         // Ejecutar la consulta
+//         const [rows] = await connection.execute(query);
+
+//         // Cerrar conexión
+//         await connection.end();
+
+//         res.json({
+//             success: true,
+//             query: query, // Enviar la consulta en la respuesta
+//             data: rows,
+//             message: 'Consulta ejecutada correctamente',
+//             rowsAffected: rows.length || 0
+//         });
+
+//     } catch (error) {
+//         res.status(500).json({
+//             success: false,
+//             error: error.message,
+//             query: query // Siempre estará definida, aunque sea null
+//         });
+//     }
+// });
+
+app.post('/api/database/execute-query', async (req, res) => {
+    let query = null; // Definir query antes del try para siempre tenerla
+
+    try {
+        const { config, query: receivedQuery } = req.body;
+        query = receivedQuery; // Asignar la consulta recibida
+
+        if (!config || !query) {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere configuración y consulta SQL',
+                query: query || null
+            });
+        }
+
+        console.log('[CONFIG RECIBIDA]:', config);
+        console.log('[QUERY RECIBIDA]:', query);
+
+        let connection;
+        try {
+            connection = await mysql.createConnection({
+                host: config.host,
+                user: config.user,
+                password: config.password,
+                database: config.database,
+                port: config.port || 3306
+            });
+        } catch (connError) {
+            return res.status(500).json({
+                success: false,
+                error: 'Error al conectar con la base de datos',
+                errorCode: connError.code,
+                details: connError.message,
+                stack: connError.stack
+            });
+        }
+
+        try {
+            const [rows] = await connection.execute(query);
+            await connection.end();
+
+            return res.json({
+                success: true,
+                query: query,
+                data: rows,
+                message: 'Consulta ejecutada correctamente',
+                rowsAffected: rows.length || 0
+
+
+            });
+
+        } catch (queryError) {
+            await connection.end();
+            return res.status(400).json({
+                success: false,
+                error: 'Error en la ejecución de la consulta SQL',
+                errorCode: queryError.code,
+                details: queryError.message,
+                query: query,
+                stack: queryError.stack
+            });
+        }
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Error inesperado en el servidor',
+            errorCode: error.code || 'UNKNOWN_ERROR',
+            details: error.message,
+            query: query || null,
+            stack: error.stack
+        });
+    }
+
+
 });
 
 // Iniciar servidor

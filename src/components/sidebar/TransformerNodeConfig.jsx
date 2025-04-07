@@ -40,16 +40,6 @@ const TransformerNodeConfig = ({ node, onChange, previousNodeData }) => {
                 return {
                     depth: 1
                 };
-            case 'excel':
-                return {
-                    operation: 'select_columns',
-                    columns: [],
-                    filterCondition: '',
-                    sortBy: '',
-                    sortDirection: 'asc',
-                    limit: 10
-                };
-
             default:
                 return {};
         }
@@ -335,127 +325,7 @@ const TransformerNodeConfig = ({ node, onChange, previousNodeData }) => {
                         </div>
                     </>
                 );
-      
-            case 'excel':
-                return (
-                    <>
-                        {renderPreviousDataPreview()}
 
-                        <div className="form-group">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Operación</label>
-                            <select
-                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                value={transformConfig.operation || 'select_columns'}
-                                onChange={(e) => handleConfigChange({
-                                    transformConfig: {
-                                        ...transformConfig,
-                                        operation: e.target.value
-                                    }
-                                })}
-                            >
-                                <option value="select_columns">Seleccionar columnas</option>
-                                <option value="filter_rows">Filtrar filas</option>
-                                <option value="sort">Ordenar</option>
-                                <option value="limit">Limitar resultados</option>
-                            </select>
-                        </div>
-
-                        {/* Controles específicos según la operación */}
-                        {transformConfig.operation === 'select_columns' && (
-                            <div className="form-group">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Columnas (separadas por coma)</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 border rounded-md"
-                                    value={Array.isArray(transformConfig.columns) ? transformConfig.columns.join(',') : ''}
-                                    onChange={(e) => {
-                                        const columns = e.target.value.split(',').map(c => c.trim()).filter(c => c);
-                                        handleConfigChange({
-                                            transformConfig: {
-                                                ...transformConfig,
-                                                columns
-                                            }
-                                        });
-                                    }}
-                                    placeholder="Ej: Nombre completo, Email, Teléfono"
-                                />
-                            </div>
-                        )}
-
-                        {transformConfig.operation === 'filter_rows' && (
-                            <div className="form-group">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Condición de filtro</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 border rounded-md"
-                                    value={transformConfig.filterCondition || ''}
-                                    onChange={(e) => handleConfigChange({
-                                        transformConfig: {
-                                            ...transformConfig,
-                                            filterCondition: e.target.value
-                                        }
-                                    })}
-                                    placeholder='row["Grupo de clientes"] === "A"'
-                                />
-                            </div>
-                        )}
-
-                        {transformConfig.operation === 'sort' && (
-                            <>
-                                <div className="form-group">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Campo para ordenar</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-3 py-2 border rounded-md"
-                                        value={transformConfig.sortBy || ''}
-                                        onChange={(e) => handleConfigChange({
-                                            transformConfig: {
-                                                ...transformConfig,
-                                                sortBy: e.target.value
-                                            }
-                                        })}
-                                        placeholder="Ej: Nombre completo"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-                                    <select
-                                        className="w-full px-3 py-2 border rounded-md"
-                                        value={transformConfig.sortDirection || 'asc'}
-                                        onChange={(e) => handleConfigChange({
-                                            transformConfig: {
-                                                ...transformConfig,
-                                                sortDirection: e.target.value
-                                            }
-                                        })}
-                                    >
-                                        <option value="asc">Ascendente</option>
-                                        <option value="desc">Descendente</option>
-                                    </select>
-                                </div>
-                            </>
-                        )}
-
-                        {transformConfig.operation === 'limit' && (
-                            <div className="form-group">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Número de filas</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-3 py-2 border rounded-md"
-                                    value={transformConfig.limit || 10}
-                                    onChange={(e) => handleConfigChange({
-                                        transformConfig: {
-                                            ...transformConfig,
-                                            limit: parseInt(e.target.value, 10)
-                                        }
-                                    })}
-                                    min="1"
-                                    placeholder="10"
-                                />
-                            </div>
-                        )}
-                    </>
-                );
             default:
                 return (
                     <>
@@ -499,7 +369,6 @@ const TransformerNodeConfig = ({ node, onChange, previousNodeData }) => {
                     <option value="aggregate">Agregar</option>
                     <option value="pick">Seleccionar</option>
                     <option value="flatten">Aplanar</option>
-                    <option value="excel">Excel</option>
                 </select>
             </div>
 

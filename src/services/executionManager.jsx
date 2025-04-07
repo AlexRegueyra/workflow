@@ -1,11 +1,6 @@
 // executionManager.js
 import axios from 'axios';
-import { processTransformation, 
-    limitExcelRows,
-    selectExcelColumns,
-    filterExcelRows,
-    sortExcelData,
-    pivotExcelData  } from '../components/sidebar/transformerProcessor';
+import dbApiService from './dbApiService';
 
 /**
  * Clase que maneja la ejecución de workflows y la integración con APIs reales
@@ -339,134 +334,141 @@ export class ExecutionManager {
             };
         }
     }
-/**
- * Ejecuta un nodo de base de datos utilizando el servicio API
- */
-async executeDatabaseNode(node, inputs, options = {}) {
-    const config = node.data?.config || {};
+    /**
+     * Ejecuta un nodo de base de datos utilizando el servicio API
+     */
 
-    console.log(`[Database] Ejecutando operación en ${config.type || 'base de datos'}`);
-    
-    // Crear copia segura de la configuración para logs (ocultar contraseña)
-    const safeConfig = { ...config };
-    if (safeConfig.password) {
-        safeConfig.password = '********';
-    }
-    
-    console.log('[DEBUG] Configuración DB:', JSON.stringify(safeConfig, null, 2));
-    console.log('[DEBUG] Inputs recibidos:', JSON.stringify(inputs, null, 2).substring(0, 500) + '...');
+    async executeDatabaseNode(node, inputs, options = {}) {
+        const config = node.data?.config || {};
 
-    try {
-        // Validar configuración mínima
-        if (!config.type || !config.host || !config.database) {
-            return {
-                success: false,
-                error: 'Configuración incompleta. Se requiere tipo, host y base de datos.',
-                data: null
-            };
+        console.log(`[Database] Ejecutando operación en ${config.type || 'base de datos'}`);
+
+        // Crear copia segura de la configuración para logs (ocultar contraseña)
+        const safeConfig = { ...config };
+        if (safeConfig.password) {
+            safeConfig.password = '********';
         }
 
-        // Procesar la consulta SQL para reemplazar variables
-        let processedQuery = config.query || '';
+        console.log('[DEBUG] Configuración DB:', JSON.stringify(safeConfig, null, 2));
+        console.log('[DEBUG] Inputs recibidos:', JSON.stringify(inputs, null, 2).substring(0, 500) + '...');
 
-        // Extraer variables de la consulta (formato {{variable}})
-        const variableMatches = processedQuery.match(/{{([^}]+)}}/g) || [];
-
-        // Reemplazar variables con valores de los inputs
-        for (const match of variableMatches) {
-            const variableName = match.replace(/{{|}}/g, '');
-            let variableValue = '';
-
-            // Navegar en la estructura de inputs para encontrar el valor
-            if (inputs && typeof inputs === 'object') {
-                // Caso 1: input.default es un array
-                if (inputs.default && Array.isArray(inputs.default)) {
-                    if (inputs.default.length > 0) {
-                        const firstItem = inputs.default[0];
-
-                        // Buscar en diferentes niveles: directo, .data, .default
-                        if (firstItem[variableName] !== undefined) {
-                            variableValue = firstItem[variableName];
-                        } else if (firstItem.data && firstItem.data[variableName] !== undefined) {
-                            variableValue = firstItem.data[variableName];
-                        } else if (firstItem.default && firstItem.default[variableName] !== undefined) {
-                            variableValue = firstItem.default[variableName];
-                        }
-                    }
-                }
-                // Caso 2: input.default es un objeto
-                else if (inputs.default && typeof inputs.default === 'object') {
-                    if (inputs.default[variableName] !== undefined) {
-                        variableValue = inputs.default[variableName];
-                    } else if (inputs.default.data && inputs.default.data[variableName] !== undefined) {
-                        variableValue = inputs.default.data[variableName];
-                    }
-                }
-                // Caso 3: buscar en el input directo
-                else if (inputs[variableName] !== undefined) {
-                    variableValue = inputs[variableName];
-                }
+        try {
+            // Validar configuración mínima
+            if (!config.type || !config.host || !config.database) {
+                return {
+                    success: false,
+                    error: 'Configuración incompleta. Se requiere tipo, host y base de datos.',
+                    data: null
+                };
             }
 
-            // Reemplazar en la consulta (asegurar que sea string)
-            processedQuery = processedQuery.replace(match, String(variableValue));
-        }
+            // Procesar la consulta SQL para reemplazar variables
+            let processedQuery = config.query || '';
 
-        console.log(`[Database] Consulta procesada: ${processedQuery}`);
+            // Extraer variables de la consulta (formato {{variable}})
+            const variableMatches = processedQuery.match(/{{([^}]+)}}/g) || [];
 
-        // Importar el servicio de API 
-        // Nota: esta importación está hecha de manera estática al principio del archivo
-        // import dbApiService from './services/dbApiService';
+            // Reemplazar variables con valores de los inputs
+            for (const match of variableMatches) {
+                const variableName = match.replace(/{{|}}/g, '');
+                let variableValue = '';
 
-        // Para mantener compatibilidad con el código existente, verificamos si el servicio existe
-        if (typeof dbApiService !== 'undefined') {
-            // Usar el servicio API para ejecutar la consulta
-            try {
-                const resultado = await dbApiService.executeQuery(config, processedQuery);
-                
+                // Navegar en la estructura de inputs para encontrar el valor
+                if (inputs && typeof inputs === 'object') {
+                    // Caso 1: input.default es un array
+                    if (inputs.default && Array.isArray(inputs.default)) {
+                        if (inputs.default.length > 0) {
+                            const firstItem = inputs.default[0];
+
+                            // Buscar en diferentes niveles: directo, .data, .default
+                            if (firstItem[variableName] !== undefined) {
+                                variableValue = firstItem[variableName];
+                            } else if (firstItem.data && firstItem.data[variableName] !== undefined) {
+                                variableValue = firstItem.data[variableName];
+                            } else if (firstItem.default && firstItem.default[variableName] !== undefined) {
+                                variableValue = firstItem.default[variableName];
+                            }
+                        }
+                    }
+                    // Caso 2: input.default es un objeto
+                    else if (inputs.default && typeof inputs.default === 'object') {
+                        if (inputs.default[variableName] !== undefined) {
+                            variableValue = inputs.default[variableName];
+                        } else if (inputs.default.data && inputs.default.data[variableName] !== undefined) {
+                            variableValue = inputs.default.data[variableName];
+                        }
+                    }
+                    // Caso 3: buscar en el input directo
+                    else if (inputs[variableName] !== undefined) {
+                        variableValue = inputs[variableName];
+                    }
+                }
+
+                // Reemplazar en la consulta (asegurar que sea string)
+                processedQuery = processedQuery.replace(match, String(variableValue));
+            }
+
+            console.log(`[Database] Consulta procesada: ${processedQuery}`);
+
+            // Importar el servicio de API 
+            // Nota: esta importación está hecha de manera estática al principio del archivo
+            // import dbApiService from './services/dbApiService';
+
+            // Para mantener compatibilidad con el código existente, verificamos si el servicio existe
+            if (typeof dbApiService !== 'undefined') {
+                // Usar el servicio API para ejecutar la consulta
+                try {
+                    const resultado = await dbApiService.executeQuery(config, processedQuery);
+
+                    return {
+                        success: resultado.success,
+                        data: resultado.data,
+                        message: resultado.message || 'Operación completada',
+                        metadata: {
+                            dbType: config.type,
+                            operation: resultado.operation || 'query',
+                            rowsAffected: resultado.rowsAffected || (Array.isArray(resultado.data) ? resultado.data.length : 0)
+                        }
+                    };
+                } catch (apiError) {
+                    console.error(`[Database] Error en API:`, apiError);
+                    return {
+                        success: false,
+                        error: apiError.message,
+                        data: null
+                    };
+                }
+            } else {
+                // Si el servicio API no está disponible, usar simulación
+                console.log('[Database] Servicio API no disponible, usando simulación');
+                // const resultado = await this.simulateDatabaseQuery(config, processedQuery, inputs);
+                const resultado = await dbApiService.executeQuery(config, processedQuery, inputs);
+
                 return {
-                    success: resultado.success,
-                    data: resultado.data,
+                    success: true,
+                    data: resultado,
                     message: resultado.message || 'Operación completada',
                     metadata: {
                         dbType: config.type,
                         operation: resultado.operation || 'query',
-                        rowsAffected: resultado.rowsAffected || (Array.isArray(resultado.data) ? resultado.data.length : 0)
+                        rowsAffected: resultado.rowsAffected || resultado.data?.length || 0
                     }
                 };
-            } catch (apiError) {
-                console.error(`[Database] Error en API:`, apiError);
-                return {
-                    success: false,
-                    error: apiError.message,
-                    data: null
-                };
             }
-        } else {
-            // Si el servicio API no está disponible, usar simulación
-            console.log('[Database] Servicio API no disponible, usando simulación');
-            const resultado = await this.simulateDatabaseQuery(config, processedQuery, inputs);
-            
+        } catch (error) {
+            console.error(`[Database] Error: ${error.message}`);
             return {
-                success: true,
-                data: resultado,
-                message: resultado.message || 'Operación completada',
-                metadata: {
-                    dbType: config.type,
-                    operation: resultado.operation || 'query',
-                    rowsAffected: resultado.rowsAffected || resultado.data?.length || 0
-                }
+                success: false,
+                error: error.message,
+                data: null
             };
         }
-    } catch (error) {
-        console.error(`[Database] Error: ${error.message}`);
-        return {
-            success: false,
-            error: error.message,
-            data: null
-        };
     }
-}
+
+
+
+
+
 
     /**
      * Ejecuta un nodo de email (simulado)

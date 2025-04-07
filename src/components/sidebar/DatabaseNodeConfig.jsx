@@ -86,7 +86,7 @@ const DatabaseNodeConfig = ({ node, onChange }) => {
                     Puerto
                 </label>
                 <input
-                    type="text"
+                    type="number"
                     value={config.port || ''}
                     onChange={(e) => handleChange('port', e.target.value)}
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -100,8 +100,8 @@ const DatabaseNodeConfig = ({ node, onChange }) => {
                 </label>
                 <input
                     type="text"
-                    value={config.username || ''}
-                    onChange={(e) => handleChange('username', e.target.value)}
+                    value={config.user || ''}
+                    onChange={(e) => handleChange('user', e.target.value)}
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     placeholder="root"
                 />
